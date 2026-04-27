@@ -1,0 +1,103 @@
+---
+description: Coding standards and preferred stack for NewsBoardAI
+alwaysApply: true
+---
+
+# Coding Standards
+
+## General
+
+Write simple, readable, maintainable code.
+
+Prefer small functions and clear names.
+
+Do not over-engineer early versions.
+
+Do not add unnecessary dependencies.
+
+Do not create large files that mix unrelated responsibilities.
+
+## Frontend Standards
+
+Use:
+
+- React
+- TypeScript
+- Tailwind CSS
+- shadcn/ui where useful
+- Recharts for small charts
+- Lucide icons if icons are needed
+
+The UI should be compact and dashboard-like.
+
+Always include:
+
+- loading state
+- error state
+- empty state
+
+Use card-based components for:
+
+- summary
+- sentiment
+- event tags
+- sources
+- impact
+
+## Backend Standards
+
+Use:
+
+- Python
+- FastAPI
+- Pydantic
+- Uvicorn
+
+Keep backend modules organized by responsibility:
+
+- routes
+- services
+- models
+- utils
+
+Use typed Pydantic models for request and response shapes.
+
+## ML Standards
+
+Use lightweight models and local inference where possible.
+
+Preferred libraries:
+
+- Hugging Face Transformers
+- Sentence Transformers
+- TensorFlow or PyTorch
+- scikit-learn only if useful for simple baselines
+
+Start with:
+
+- rule-based event detection
+- pretrained sentiment model
+- simple importance scoring
+
+Later improve with a trained classifier.
+
+## Environment Variables
+
+Never hardcode secrets.
+
+Use `.env` locally and `.env.example` for documentation.
+
+Do not commit real API keys.
+
+## Git Hygiene
+
+Keep commits focused.
+
+Do not commit:
+
+- `.env`
+- model files
+- large datasets
+- generated build folders
+- node_modules
+- virtual environments

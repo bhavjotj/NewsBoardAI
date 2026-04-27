@@ -33,4 +33,6 @@ models/
 *.onnx
 
 # Editor
-.cursor/
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
