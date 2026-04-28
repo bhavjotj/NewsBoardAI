@@ -8,6 +8,25 @@ External datasets help because live Google News RSS calls produce only a few
 examples at a time. Larger local datasets can improve basic language coverage
 without scraping more articles.
 
+## Hybrid Predictor
+
+`apps/api/app/services/baseline_predictor.py` wraps the trained baseline models
+with a small domain-aware post-processing layer. It:
+
+- loads any available baseline models from `models/baseline/`
+- uses `predict_proba` when available and returns label confidence
+- keeps raw model predictions separate from final adjusted predictions
+- adds notes when confidence is low or a model is missing
+- uses reusable domain lexicons for finance, risk, growth, sports, gaming,
+  politics, and product launches
+
+The post-processing layer is intentionally conservative. It adjusts predictions
+mainly when confidence is low or when multiple related terms agree. This helps
+with gaps in external datasets, especially AG News not having a gaming class.
+For example, several terms such as `Nintendo`, `Switch`, `console`, `review`,
+or `game` can move `topic_mode` toward `gaming` even if the topic model only
+knows broad AG News classes.
+
 ## Setup
 
 ```bash
@@ -107,14 +126,20 @@ PYTHONPATH=apps/api .venv/bin/python apps/api/scripts/predict_baseline.py \
   --snippet "Revenue growth and pricing updates drew investor attention."
 ```
 
-The prediction script prints whichever trained models exist: sentiment, event
-tag, and topic mode.
+The prediction script prints raw model predictions, final adjusted predictions,
+confidence values when available, and any post-processing notes.
 
 ## Current Limitations
 
 - The project-labeled set is still tiny, so project-only models are rough.
 - External labels are not identical to NewsBoardAI labels.
 - AG News has broad categories, so topic mode is a coarse baseline.
+- AG News does not include a gaming class, so gaming detection is currently a
+  rule-assisted fallback.
 - The event model still depends on project labels and predicts only the first
   event tag.
+- Confidence values from small or mismatched datasets can be overconfident.
+- Lexicon post-processing can improve obvious cases, but it is not a substitute
+  for a larger labeled NewsBoardAI dataset.
 - These models are not integrated into backend inference yet.
+- This is still not the final neural network or transformer stage.

@@ -8,9 +8,7 @@ API_ROOT = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(API_ROOT))
 
-import joblib
-
-from app.services.ml_preprocessing import build_model_text
+from app.services.baseline_predictor import BaselinePredictor, LabelPrediction
 
 DEFAULT_MODEL_DIR = PROJECT_ROOT / "models" / "baseline"
 
@@ -28,28 +26,39 @@ def main() -> None:
     parser.add_argument("--model-dir", type=Path, default=DEFAULT_MODEL_DIR)
     args = parser.parse_args()
 
-    example = {"title": args.title, "snippet": args.snippet}
-    text = build_model_text(example)
+    result = BaselinePredictor(model_dir=args.model_dir).predict(
+        title=args.title,
+        snippet=args.snippet,
+    )
 
-    print(f"Text: {text}")
-    predict_if_available("sentiment", args.model_dir / "sentiment_model.joblib", text)
-    predict_if_available("event tag", args.model_dir / "event_model.joblib", text)
-    predict_if_available("topic mode", args.model_dir / "topic_model.joblib", text)
+    print(f"Text: {result.input_text}")
+    print("\nRaw model predictions:")
+    print_prediction("sentiment", result.raw_predictions["sentiment"])
+    print_prediction("event tag", result.raw_predictions["event_tag"])
+    print_prediction("topic mode", result.raw_predictions["topic_mode"])
+
+    print("\nFinal predictions:")
+    print_prediction("sentiment", result.sentiment)
+    print_prediction("event tag", result.event_tag)
+    print_prediction("topic mode", result.topic_mode)
+
+    if result.adjustments:
+        print("\nAdjustments:")
+        for adjustment in result.adjustments:
+            print(f"- {adjustment}")
+    if result.notes:
+        print("\nNotes:")
+        for note in result.notes:
+            print(f"- {note}")
 
 
-def predict_if_available(label: str, model_path: Path, text: str) -> None:
-    if not model_path.exists():
+def print_prediction(name: str, prediction: LabelPrediction) -> None:
+    if prediction.label is None:
         return
-    prediction = predict_one(model_path, text)
-    print(f"Predicted {label}: {prediction}")
-
-
-def predict_one(model_path: Path, text: str) -> str:
-    if not model_path.exists():
-        raise SystemExit(f"Missing model file: {model_path}. Train models first.")
-    artifact = joblib.load(model_path)
-    model = artifact["model"]
-    return str(model.predict([text])[0])
+    confidence = (
+        "n/a" if prediction.confidence is None else f"{prediction.confidence:.2f}"
+    )
+    print(f"- {name}: {prediction.label} (confidence: {confidence})")
 
 
 if __name__ == "__main__":
