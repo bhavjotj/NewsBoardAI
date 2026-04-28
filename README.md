@@ -33,21 +33,22 @@ Start the FastAPI backend:
 PYTHONPATH=apps/api .venv/bin/uvicorn app.main:app --reload --app-dir apps/api
 ```
 
-Mock dashboard request:
+Dashboard request:
 
 ```bash
 curl -X POST "http://127.0.0.1:8000/api/news/dashboard" \
   -H "Content-Type: application/json" \
-  -d '{"query":"Tesla","max_results":3,"mode":"business"}'
+  -d '{"query":"Tesla","max_results":5}'
 ```
 
-Google News RSS dashboard request:
+Gaming topic request:
 
 ```bash
 curl -X POST "http://127.0.0.1:8000/api/news/dashboard" \
   -H "Content-Type: application/json" \
-  -d '{"query":"Nintendo Switch 2","max_results":5,"mode":"gaming","use_real_news":true}'
+  -d '{"query":"Nintendo Switch 2","max_results":5}'
 ```
 
 The response includes `data_source`, which is `mock`, `google_news_rss`, or
-`fallback_mock` if Google News RSS is unavailable.
+`fallback_mock` if Google News RSS is unavailable. It also includes
+`detected_mode`, which the backend infers from the query and recent headlines.
