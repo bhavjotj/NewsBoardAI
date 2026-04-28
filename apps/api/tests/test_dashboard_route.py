@@ -19,8 +19,9 @@ def test_dashboard_route_returns_compact_response() -> None:
     assert body["data_source"] == DataSource.MOCK
     assert body["time_window"] == "Recent news"
     assert body["brief"]
+    assert "source cards" not in body["brief"]
     assert body["sentiment"]["label"] in {"positive", "neutral", "negative", "mixed"}
-    assert "business" in body["event_tags"]
+    assert "market" in body["event_tags"]
     assert len(body["sources"]) == 3
     assert body["confidence"] in {"low", "medium", "high"}
     assert body["possible_impact"]

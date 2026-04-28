@@ -7,6 +7,7 @@ from app.models.dashboard import (
 )
 from app.services.analyzer import DashboardAnalysis
 from app.services.fetchers import NewsArticle
+from app.utils.text import clean_snippet
 
 
 def format_dashboard_response(
@@ -31,7 +32,7 @@ def format_dashboard_response(
                 title=article.title,
                 source=article.source,
                 published_at=article.published_at,
-                snippet=article.snippet,
+                snippet=clean_snippet(article.snippet, article.source),
                 url=article.url,
             )
             for article in articles
@@ -45,10 +46,21 @@ def _brief(
     topic: str, articles: list[NewsArticle], analysis: DashboardAnalysis
 ) -> str:
     if not articles:
-        return f"No recent source cards are available for {topic}."
+        return f"No recent coverage is available for {topic}."
 
+    tags = _tag_summary(analysis.event_tags)
     top_source = articles[0].source
+    top_title = articles[0].title
     return (
-        f"{topic} has a {analysis.overall_signal} signal across "
-        f"{len(articles)} recent source cards, led by {top_source}."
+        f"{topic} is showing a {analysis.overall_signal} signal around {tags}. "
+        f"The clearest recent item is from {top_source}: {top_title}."
     )
+
+
+def _tag_summary(tags: list[str]) -> str:
+    useful_tags = [tag for tag in tags if tag != "general"][:3]
+    if not useful_tags:
+        return "general coverage"
+    if len(useful_tags) == 1:
+        return useful_tags[0]
+    return ", ".join(useful_tags[:-1]) + f", and {useful_tags[-1]}"
