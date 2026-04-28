@@ -1,8 +1,14 @@
 from fastapi import APIRouter
 
-from app.models.dashboard import DashboardRequest, DashboardResponse, DataSource
-from app.services.analyzer import analyze_articles
-from app.services.fetchers import fetch_google_news_rss, fetch_mock_news
+from app.models.dashboard import (
+    DashboardMode,
+    DashboardRequest,
+    DashboardResponse,
+    DataSource,
+)
+from app.services.analyzer import analyze_articles, detect_mode
+from app.services.data_collection import save_news_examples
+from app.services.fetchers import NewsArticle, fetch_google_news_rss, fetch_mock_news
 from app.services.formatter import format_dashboard_response
 
 router = APIRouter()
@@ -11,14 +17,25 @@ router = APIRouter()
 @router.post("/dashboard", response_model=DashboardResponse)
 def create_dashboard(request: DashboardRequest) -> DashboardResponse:
     articles, data_source = _fetch_articles(request)
-    analysis = analyze_articles(articles, request.mode)
-    return format_dashboard_response(request, articles, analysis, data_source)
+    detected_mode = request.mode or detect_mode(request.query, articles)
+    if request.save_examples and data_source == DataSource.GOOGLE_NEWS_RSS:
+        save_news_examples(
+            query=request.query,
+            detected_mode=detected_mode,
+            articles=articles,
+            data_source=data_source,
+        )
+    analysis = analyze_articles(articles, detected_mode)
+    return format_dashboard_response(
+        request, articles, analysis, data_source, detected_mode
+    )
 
 
-def _fetch_articles(request: DashboardRequest):
+def _fetch_articles(request: DashboardRequest) -> tuple[list[NewsArticle], DataSource]:
     if not request.use_real_news:
+        mock_mode = request.mode or detect_mode(request.query, [])
         return (
-            fetch_mock_news(request.query, request.max_results, request.mode),
+            fetch_mock_news(request.query, request.max_results, mock_mode),
             DataSource.MOCK,
         )
 
@@ -30,6 +47,10 @@ def _fetch_articles(request: DashboardRequest):
         pass
 
     return (
-        fetch_mock_news(request.query, request.max_results, request.mode),
+        fetch_mock_news(
+            request.query,
+            request.max_results,
+            request.mode or detect_mode(request.query, []),
+        ),
         DataSource.FALLBACK_MOCK,
     )

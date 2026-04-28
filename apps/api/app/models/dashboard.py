@@ -24,8 +24,9 @@ class DataSource(str, Enum):
 class DashboardRequest(BaseModel):
     query: str = Field(..., min_length=1)
     max_results: int = Field(default=5, ge=1, le=5)
-    mode: DashboardMode = DashboardMode.GENERAL
-    use_real_news: bool = False
+    mode: Optional[DashboardMode] = None
+    use_real_news: bool = True
+    save_examples: bool = False
 
     @field_validator("query")
     @classmethod
@@ -52,6 +53,7 @@ class SourceCard(BaseModel):
 class DashboardResponse(BaseModel):
     topic: str
     data_source: DataSource
+    detected_mode: DashboardMode
     time_window: str
     overall_signal: str
     brief: str

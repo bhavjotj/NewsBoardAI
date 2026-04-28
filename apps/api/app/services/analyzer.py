@@ -62,6 +62,58 @@ EVENT_KEYWORDS = {
     "risk": {"risk", "delay", "warning", "concern", "uncertain", "weak"},
 }
 
+MODE_KEYWORDS = {
+    DashboardMode.BUSINESS: {
+        "stock",
+        "shares",
+        "earnings",
+        "revenue",
+        "profit",
+        "market",
+        "investor",
+        "analyst",
+        "tesla",
+        "apple",
+        "nvidia",
+    },
+    DashboardMode.GAMING: {
+        "nintendo",
+        "switch",
+        "playstation",
+        "xbox",
+        "console",
+        "game",
+        "gaming",
+        "studio",
+        "trailer",
+    },
+    DashboardMode.SPORTS: {
+        "nba",
+        "nfl",
+        "nhl",
+        "mlb",
+        "team",
+        "player",
+        "coach",
+        "match",
+        "matchup",
+        "playoffs",
+        "score",
+    },
+    DashboardMode.POLITICS: {
+        "election",
+        "policy",
+        "senate",
+        "congress",
+        "president",
+        "minister",
+        "vote",
+        "bill",
+        "government",
+        "campaign",
+    },
+}
+
 MODE_TAGS = {
     DashboardMode.BUSINESS: "market",
     DashboardMode.SPORTS: "sports",
@@ -98,6 +150,18 @@ def analyze_articles(
         confidence=confidence,
         possible_impact=_possible_impact(sentiment_label, mode),
     )
+
+
+def detect_mode(query: str, articles: list[NewsArticle]) -> DashboardMode:
+    text = " ".join([query.lower(), *[_article_text(article) for article in articles]])
+    scores = {
+        mode: _keyword_count(text, keywords)
+        for mode, keywords in MODE_KEYWORDS.items()
+    }
+    best_mode, best_score = max(scores.items(), key=lambda item: item[1])
+    if best_score == 0:
+        return DashboardMode.GENERAL
+    return best_mode
 
 
 def _article_sentiment_score(article: NewsArticle) -> float:

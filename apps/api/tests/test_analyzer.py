@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from app.models.dashboard import DashboardMode
-from app.services.analyzer import analyze_articles
+from app.services.analyzer import analyze_articles, detect_mode
 from app.services.fetchers import NewsArticle, fetch_mock_news
 
 
@@ -98,3 +98,47 @@ def test_business_mode_uses_market_aware_possible_impact() -> None:
     analysis = analyze_articles(articles, DashboardMode.BUSINESS)
 
     assert "market and business attention" in analysis.possible_impact
+
+
+def test_detects_tesla_like_business_query() -> None:
+    articles = [
+        article(
+            "Tesla shares rise after earnings update",
+            "Analysts point to revenue growth and investor interest.",
+        )
+    ]
+
+    assert detect_mode("Tesla stock news", articles) == DashboardMode.BUSINESS
+
+
+def test_detects_nintendo_switch_like_gaming_query() -> None:
+    articles = [
+        article(
+            "Nintendo Switch 2 console launch details emerge",
+            "New game trailers and hardware reports are drawing attention.",
+        )
+    ]
+
+    assert detect_mode("Nintendo Switch 2", articles) == DashboardMode.GAMING
+
+
+def test_detects_sports_like_query() -> None:
+    articles = [
+        article(
+            "Lakers playoff matchup puts star player in focus",
+            "The coach discussed team adjustments before the next game.",
+        )
+    ]
+
+    assert detect_mode("Lakers playoff matchup", articles) == DashboardMode.SPORTS
+
+
+def test_detects_general_fallback_query() -> None:
+    articles = [
+        article(
+            "Local community event draws visitors",
+            "Coverage highlights public interest and a busy weekend schedule.",
+        )
+    ]
+
+    assert detect_mode("community event", articles) == DashboardMode.GENERAL
