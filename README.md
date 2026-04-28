@@ -24,3 +24,30 @@ The goal is to summarize only a small number of recent news items, classify thei
 ## Project Status
 
 Initial setup in progress.
+
+## Backend MVP
+
+Start the FastAPI backend:
+
+```bash
+PYTHONPATH=apps/api .venv/bin/uvicorn app.main:app --reload --app-dir apps/api
+```
+
+Mock dashboard request:
+
+```bash
+curl -X POST "http://127.0.0.1:8000/api/news/dashboard" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"Tesla","max_results":3,"mode":"business"}'
+```
+
+Google News RSS dashboard request:
+
+```bash
+curl -X POST "http://127.0.0.1:8000/api/news/dashboard" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"Nintendo Switch 2","max_results":5,"mode":"gaming","use_real_news":true}'
+```
+
+The response includes `data_source`, which is `mock`, `google_news_rss`, or
+`fallback_mock` if Google News RSS is unavailable.

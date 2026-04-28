@@ -1,4 +1,5 @@
 from app.models.dashboard import (
+    DataSource,
     DashboardRequest,
     DashboardResponse,
     SentimentSummary,
@@ -12,9 +13,11 @@ def format_dashboard_response(
     request: DashboardRequest,
     articles: list[NewsArticle],
     analysis: DashboardAnalysis,
+    data_source: DataSource,
 ) -> DashboardResponse:
     return DashboardResponse(
         topic=request.query,
+        data_source=data_source,
         time_window="Recent news",
         overall_signal=analysis.overall_signal,
         brief=_brief(request.query, articles, analysis),
