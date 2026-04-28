@@ -21,6 +21,8 @@ pnpm-debug.log*
 
 # Data
 data/raw/
+data/labeled/
+data/external/
 data/processed/
 *.csv
 *.jsonl

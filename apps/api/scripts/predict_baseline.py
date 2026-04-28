@@ -30,12 +30,18 @@ def main() -> None:
 
     example = {"title": args.title, "snippet": args.snippet}
     text = build_model_text(example)
-    sentiment = predict_one(args.model_dir / "sentiment_model.joblib", text)
-    event = predict_one(args.model_dir / "event_model.joblib", text)
 
     print(f"Text: {text}")
-    print(f"Predicted sentiment: {sentiment}")
-    print(f"Predicted event tag: {event}")
+    predict_if_available("sentiment", args.model_dir / "sentiment_model.joblib", text)
+    predict_if_available("event tag", args.model_dir / "event_model.joblib", text)
+    predict_if_available("topic mode", args.model_dir / "topic_model.joblib", text)
+
+
+def predict_if_available(label: str, model_path: Path, text: str) -> None:
+    if not model_path.exists():
+        return
+    prediction = predict_one(model_path, text)
+    print(f"Predicted {label}: {prediction}")
 
 
 def predict_one(model_path: Path, text: str) -> str:

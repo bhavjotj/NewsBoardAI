@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from collections import Counter
 from datetime import datetime, timezone
@@ -12,56 +11,80 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(API_ROOT))
 
 import joblib
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, classification_report
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
-from sklearn.feature_extraction.text import TfidfVectorizer
 
-from app.services.ml_preprocessing import build_model_text
+from app.services.datasets import (
+    external_max_rows,
+    load_ag_news,
+    load_financial_phrasebank,
+    load_project_labeled_jsonl,
+)
 
-DEFAULT_INPUT_PATH = PROJECT_ROOT / "data" / "labeled" / "news_labeled.jsonl"
+DEFAULT_PROJECT_DATA = PROJECT_ROOT / "data" / "labeled" / "news_labeled.jsonl"
 DEFAULT_MODEL_DIR = PROJECT_ROOT / "models" / "baseline"
+DEFAULT_MAX_ROWS = 10000
 MIN_SPLIT_EXAMPLES = 30
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train NewsBoardAI baselines.")
-    parser.add_argument("--input", type=Path, default=DEFAULT_INPUT_PATH)
+    parser.add_argument("--project-data", type=Path, default=DEFAULT_PROJECT_DATA)
+    parser.add_argument("--sentiment-data", type=Path)
+    parser.add_argument("--topic-data", type=Path)
+    parser.add_argument("--max-rows", type=int, default=DEFAULT_MAX_ROWS)
     parser.add_argument("--model-dir", type=Path, default=DEFAULT_MODEL_DIR)
     args = parser.parse_args()
 
-    rows = read_jsonl(args.input)
-    if not rows:
-        print(f"No labeled examples found at {args.input}")
-        return
-
+    max_rows = external_max_rows(args.max_rows)
+    project_examples = load_project_labeled_jsonl(args.project_data)
     args.model_dir.mkdir(parents=True, exist_ok=True)
+
+    sentiment_examples = sentiment_training_examples(args, project_examples, max_rows)
     train_and_save(
         name="sentiment",
-        rows=rows,
-        label_getter=lambda row: str(row.get("sentiment_label", "")).strip(),
+        examples=sentiment_examples,
         output_path=args.model_dir / "sentiment_model.joblib",
     )
+
+    event_examples = [
+        {"text": example["text"], "label": example["event_label"]}
+        for example in project_examples
+        if example.get("event_label")
+    ]
     train_and_save(
         name="event",
-        rows=rows,
-        label_getter=primary_event_label,
+        examples=event_examples,
         output_path=args.model_dir / "event_model.joblib",
     )
 
+    if args.topic_data:
+        topic_examples = load_ag_news(args.topic_data, max_rows=max_rows)
+        train_and_save(
+            name="topic",
+            examples=topic_examples,
+            output_path=args.model_dir / "topic_model.joblib",
+        )
 
-def train_and_save(name, rows, label_getter, output_path: Path) -> None:
-    texts = []
-    labels = []
-    for row in rows:
-        label = label_getter(row)
-        text = build_model_text(row)
-        if label and text:
-            texts.append(text)
-            labels.append(label)
 
+def sentiment_training_examples(args, project_examples, max_rows):
+    if args.sentiment_data:
+        return load_financial_phrasebank(args.sentiment_data, max_rows=max_rows)
+    return [
+        {"text": example["text"], "label": example["sentiment_label"]}
+        for example in project_examples
+        if example.get("sentiment_label")
+    ]
+
+
+def train_and_save(name: str, examples: list[dict], output_path: Path) -> None:
+    texts = [str(example["text"]) for example in examples if example.get("label")]
+    labels = [str(example["label"]) for example in examples if example.get("label")]
     counts = Counter(labels)
+
     print(f"\n{name.title()} label counts: {dict(sorted(counts.items()))}")
     if not labels:
         print(f"Warning: no labeled {name} examples available; skipping.")
@@ -128,24 +151,6 @@ def make_pipeline() -> Pipeline:
 def can_split(labels: list[str]) -> bool:
     counts = Counter(labels)
     return len(labels) >= MIN_SPLIT_EXAMPLES and min(counts.values()) >= 2
-
-
-def primary_event_label(row: dict) -> str:
-    labels = row.get("event_tags_label", [])
-    if isinstance(labels, list) and labels:
-        return str(labels[0]).strip()
-    if isinstance(labels, str):
-        return labels.split(",", 1)[0].strip()
-    return ""
-
-
-def read_jsonl(path: Path) -> list[dict]:
-    rows = []
-    with path.open("r", encoding="utf-8") as file:
-        for line in file:
-            if line.strip():
-                rows.append(json.loads(line))
-    return rows
 
 
 if __name__ == "__main__":
