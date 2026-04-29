@@ -21,12 +21,19 @@ class DataSource(str, Enum):
     FALLBACK_MOCK = "fallback_mock"
 
 
+class AnalysisSource(str, Enum):
+    RULE_BASED = "rule_based"
+    HYBRID_ML = "hybrid_ml"
+    HYBRID_ML_FALLBACK = "hybrid_ml_fallback"
+
+
 class DashboardRequest(BaseModel):
     query: str = Field(..., min_length=1)
     max_results: int = Field(default=5, ge=1, le=5)
     mode: Optional[DashboardMode] = None
     use_real_news: bool = True
     save_examples: bool = False
+    use_ml: bool = True
 
     @field_validator("query")
     @classmethod
@@ -53,6 +60,7 @@ class SourceCard(BaseModel):
 class DashboardResponse(BaseModel):
     topic: str
     data_source: DataSource
+    analysis_source: AnalysisSource
     detected_mode: DashboardMode
     time_window: str
     overall_signal: str

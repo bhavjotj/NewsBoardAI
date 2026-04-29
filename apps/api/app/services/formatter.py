@@ -1,4 +1,5 @@
 from app.models.dashboard import (
+    AnalysisSource,
     DataSource,
     DashboardMode,
     DashboardRequest,
@@ -17,10 +18,12 @@ def format_dashboard_response(
     analysis: DashboardAnalysis,
     data_source: DataSource,
     detected_mode: DashboardMode,
+    analysis_source: AnalysisSource,
 ) -> DashboardResponse:
     return DashboardResponse(
         topic=request.query,
         data_source=data_source,
+        analysis_source=analysis_source,
         detected_mode=detected_mode,
         time_window="Recent news",
         overall_signal=analysis.overall_signal,
@@ -53,10 +56,9 @@ def _brief(
 
     tags = _tag_summary(analysis.event_tags)
     top_source = articles[0].source
-    top_title = articles[0].title
     return (
         f"{topic} is showing a {analysis.overall_signal} signal around {tags}. "
-        f"The clearest recent item is from {top_source}: {top_title}."
+        f"Recent coverage led by {top_source} points to a possible shift worth watching."
     )
 
 
