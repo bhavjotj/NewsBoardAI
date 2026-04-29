@@ -13,6 +13,7 @@ from app.models.dashboard import (
 from app.routes.news import create_dashboard
 from app.services.analyzer import DashboardAnalysis
 from app.services.fetchers import NewsArticle
+from app.services.hybrid_analyzer import HybridAnalysisResult
 
 
 def test_dashboard_route_returns_compact_response() -> None:
@@ -158,9 +159,9 @@ def test_dashboard_request_rejects_empty_query() -> None:
 
 
 def test_dashboard_route_uses_hybrid_ml_when_available(monkeypatch) -> None:
-    def fake_analyze_with_hybrid_ml(articles, fallback_mode):
-        return (
-            DashboardAnalysis(
+    def fake_analyze_with_hybrid_ml(**kwargs):
+        return HybridAnalysisResult(
+            analysis=DashboardAnalysis(
                 sentiment_label="positive",
                 sentiment_score=0.74,
                 overall_signal="positive",
@@ -168,8 +169,8 @@ def test_dashboard_route_uses_hybrid_ml_when_available(monkeypatch) -> None:
                 confidence="medium",
                 possible_impact="Possible positive signal for review, release, or player interest.",
             ),
-            DashboardMode.GAMING,
-            AnalysisSource.HYBRID_ML,
+            detected_mode=DashboardMode.GAMING,
+            analysis_source=AnalysisSource.HYBRID_ML,
         )
 
     monkeypatch.setattr(
@@ -184,6 +185,38 @@ def test_dashboard_route_uses_hybrid_ml_when_available(monkeypatch) -> None:
     assert response.detected_mode == DashboardMode.GAMING
     assert response.sentiment.label == "positive"
     assert response.event_tags == ["gaming", "launch"]
+
+
+def test_dashboard_route_includes_debug_when_requested(monkeypatch) -> None:
+    def fake_analyze_with_hybrid_ml(**kwargs):
+        return HybridAnalysisResult(
+            analysis=DashboardAnalysis(
+                sentiment_label="neutral",
+                sentiment_score=0.0,
+                overall_signal="unclear",
+                event_tags=["sports"],
+                confidence="medium",
+                possible_impact="Impact is unclear.",
+            ),
+            detected_mode=DashboardMode.SPORTS,
+            analysis_source=AnalysisSource.HYBRID_ML,
+            debug={"aggregation_notes": ["debug enabled"]},
+        )
+
+    monkeypatch.setattr(
+        "app.routes.news.analyze_with_hybrid_ml", fake_analyze_with_hybrid_ml
+    )
+
+    response = create_dashboard(
+        DashboardRequest(
+            query="NHL",
+            max_results=2,
+            use_real_news=False,
+            debug_analysis=True,
+        )
+    )
+
+    assert response.analysis_debug == {"aggregation_notes": ["debug enabled"]}
 
 
 def test_dashboard_route_falls_back_when_models_are_missing(monkeypatch) -> None:

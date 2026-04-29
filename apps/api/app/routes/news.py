@@ -11,16 +11,20 @@ from app.services.analyzer import analyze_articles, detect_mode
 from app.services.data_collection import save_news_examples
 from app.services.fetchers import NewsArticle, fetch_google_news_rss, fetch_mock_news
 from app.services.formatter import format_dashboard_response
-from app.services.hybrid_analyzer import analyze_with_hybrid_ml
+from app.services.hybrid_analyzer import HybridAnalysisResult, analyze_with_hybrid_ml
 
 router = APIRouter()
 
 
-@router.post("/dashboard", response_model=DashboardResponse)
+@router.post(
+    "/dashboard",
+    response_model=DashboardResponse,
+    response_model_exclude_none=True,
+)
 def create_dashboard(request: DashboardRequest) -> DashboardResponse:
     articles, data_source = _fetch_articles(request)
     fallback_mode = request.mode or detect_mode(request.query, articles)
-    analysis, detected_mode, analysis_source = _analyze_articles(
+    analysis_result = _analyze_articles(
         request,
         articles,
         fallback_mode,
@@ -28,17 +32,18 @@ def create_dashboard(request: DashboardRequest) -> DashboardResponse:
     if request.save_examples and data_source == DataSource.GOOGLE_NEWS_RSS:
         save_news_examples(
             query=request.query,
-            detected_mode=detected_mode,
+            detected_mode=analysis_result.detected_mode,
             articles=articles,
             data_source=data_source,
         )
     return format_dashboard_response(
         request,
         articles,
-        analysis,
+        analysis_result.analysis,
         data_source,
-        detected_mode,
-        analysis_source,
+        analysis_result.detected_mode,
+        analysis_result.analysis_source,
+        analysis_result.debug if request.debug_analysis else None,
     )
 
 
@@ -73,9 +78,15 @@ def _analyze_articles(
     fallback_mode: DashboardMode,
 ):
     if request.use_ml:
-        return analyze_with_hybrid_ml(articles, fallback_mode)
-    return (
-        analyze_articles(articles, fallback_mode),
-        fallback_mode,
-        AnalysisSource.RULE_BASED,
+        return analyze_with_hybrid_ml(
+            query=request.query,
+            articles=articles,
+            fallback_mode=fallback_mode,
+            include_debug=request.debug_analysis,
+        )
+    return HybridAnalysisResult(
+        analysis=analyze_articles(articles, fallback_mode),
+        detected_mode=fallback_mode,
+        analysis_source=AnalysisSource.RULE_BASED,
+        debug=None,
     )

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from app.models.dashboard import (
     AnalysisSource,
     DataSource,
@@ -19,6 +21,7 @@ def format_dashboard_response(
     data_source: DataSource,
     detected_mode: DashboardMode,
     analysis_source: AnalysisSource,
+    analysis_debug: dict | None = None,
 ) -> DashboardResponse:
     return DashboardResponse(
         topic=request.query,
@@ -45,6 +48,7 @@ def format_dashboard_response(
         ],
         confidence=analysis.confidence,
         possible_impact=analysis.possible_impact,
+        analysis_debug=analysis_debug,
     )
 
 
@@ -53,6 +57,8 @@ def _brief(
 ) -> str:
     if not articles:
         return f"No recent coverage is available for {topic}."
+    if analysis.brief:
+        return analysis.brief
 
     tags = _tag_summary(analysis.event_tags)
     top_source = articles[0].source

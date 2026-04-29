@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field, HttpUrl, field_validator
 
@@ -34,6 +34,7 @@ class DashboardRequest(BaseModel):
     use_real_news: bool = True
     save_examples: bool = False
     use_ml: bool = True
+    debug_analysis: bool = False
 
     @field_validator("query")
     @classmethod
@@ -70,3 +71,4 @@ class DashboardResponse(BaseModel):
     sources: list[SourceCard]
     confidence: str
     possible_impact: str
+    analysis_debug: Optional[dict[str, Any]] = None

@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from re import escape, search, sub
+from typing import Optional
 
 from app.models.dashboard import DashboardMode
 from app.services.fetchers import NewsArticle
@@ -130,6 +131,7 @@ class DashboardAnalysis:
     event_tags: list[str]
     confidence: str
     possible_impact: str
+    brief: Optional[str] = None
 
 
 def analyze_articles(
