@@ -44,6 +44,8 @@ def create_dashboard(request: DashboardRequest) -> DashboardResponse:
         analysis_result.detected_mode,
         analysis_result.analysis_source,
         analysis_result.debug if request.debug_analysis else None,
+        analysis_result.torch_used,
+        analysis_result.torch_available,
     )
 
 
@@ -83,6 +85,7 @@ def _analyze_articles(
             articles=articles,
             fallback_mode=fallback_mode,
             include_debug=request.debug_analysis,
+            use_torch=request.use_torch,
         )
     return HybridAnalysisResult(
         analysis=analyze_articles(articles, fallback_mode),

@@ -159,7 +159,10 @@ def test_dashboard_request_rejects_empty_query() -> None:
 
 
 def test_dashboard_route_uses_hybrid_ml_when_available(monkeypatch) -> None:
+    seen_kwargs = {}
+
     def fake_analyze_with_hybrid_ml(**kwargs):
+        seen_kwargs.update(kwargs)
         return HybridAnalysisResult(
             analysis=DashboardAnalysis(
                 sentiment_label="positive",
@@ -185,6 +188,46 @@ def test_dashboard_route_uses_hybrid_ml_when_available(monkeypatch) -> None:
     assert response.detected_mode == DashboardMode.GAMING
     assert response.sentiment.label == "positive"
     assert response.event_tags == ["gaming", "launch"]
+    assert seen_kwargs["use_torch"] is True
+
+
+def test_use_torch_false_is_passed_to_hybrid_analyzer(monkeypatch) -> None:
+    seen_kwargs = {}
+
+    def fake_analyze_with_hybrid_ml(**kwargs):
+        seen_kwargs.update(kwargs)
+        return HybridAnalysisResult(
+            analysis=DashboardAnalysis(
+                sentiment_label="neutral",
+                sentiment_score=0.0,
+                overall_signal="unclear",
+                event_tags=["business"],
+                confidence="medium",
+                possible_impact="Impact is unclear.",
+            ),
+            detected_mode=DashboardMode.BUSINESS,
+            analysis_source=AnalysisSource.HYBRID_ML,
+            torch_used=False,
+            torch_available=False,
+        )
+
+    monkeypatch.setattr(
+        "app.routes.news.analyze_with_hybrid_ml", fake_analyze_with_hybrid_ml
+    )
+
+    response = create_dashboard(
+        DashboardRequest(
+            query="Microsoft stock",
+            max_results=2,
+            use_real_news=False,
+            use_torch=False,
+        )
+    )
+
+    body = response.model_dump()
+    assert seen_kwargs["use_torch"] is False
+    assert body["torch_used"] is False
+    assert body["torch_available"] is False
 
 
 def test_dashboard_route_includes_debug_when_requested(monkeypatch) -> None:
@@ -219,13 +262,27 @@ def test_dashboard_route_includes_debug_when_requested(monkeypatch) -> None:
     assert response.analysis_debug == {"aggregation_notes": ["debug enabled"]}
 
 
+def test_dashboard_request_uses_torch_by_default() -> None:
+    request = DashboardRequest(query="Nvidia stock")
+
+    assert request.use_ml is True
+    assert request.use_torch is True
+
+
 def test_dashboard_route_falls_back_when_models_are_missing(monkeypatch) -> None:
     class EmptyPredictor:
         models = {}
 
+    class MissingTorchService:
+        available = False
+
     monkeypatch.setattr(
         "app.services.hybrid_analyzer.BaselinePredictor",
         lambda: EmptyPredictor(),
+    )
+    monkeypatch.setattr(
+        "app.services.hybrid_analyzer.get_torch_topic_service",
+        lambda: MissingTorchService(),
     )
 
     response = create_dashboard(

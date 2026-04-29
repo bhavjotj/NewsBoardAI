@@ -2,7 +2,9 @@
 
 The PyTorch event model is a lightweight neural upgrade for NewsBoardAI's ML layer. It predicts broad topic or event labels from a news title and snippet, while staying local-first and CPU-friendly.
 
-This model does not replace the existing scikit-learn baseline or the rule-based dashboard analyzer. It is a separate training and prediction path that can later be integrated into the dashboard when enough local data exists.
+This model does not replace the existing scikit-learn baseline or the rule-based dashboard analyzer. In the live dashboard it is used as an optional broad-topic signal for modes such as `business`, `sports`, `tech`, and `politics/general`.
+
+The hybrid analyzer still owns specific event tags such as `gaming`, `launch`, `review`, `risk`, `workforce`, `legal`, `pricing`, `product`, and `earnings`.
 
 ## Why It Exists
 
@@ -15,6 +17,31 @@ It is meant to improve the project story around:
 - model checkpoints and metadata
 - CPU-friendly training
 - future dashboard inference upgrades
+
+## Dashboard Integration
+
+Dashboard requests include:
+
+```json
+{
+  "use_ml": true,
+  "use_torch": true
+}
+```
+
+`use_ml` controls the overall hybrid analyzer. `use_torch` controls whether the analyzer uses the local PyTorch broad-topic classifier inside that flow.
+
+If `models/torch_event/model.pt` or `models/torch_event/metadata.json` are missing, or if PyTorch cannot be loaded, NewsBoardAI continues with the existing hybrid/rule-based analyzer.
+
+PyTorch broad predictions are used conservatively:
+
+- `business` strengthens business/market mode scoring
+- `sports` strengthens sports mode scoring
+- `tech` supports AI, product, update, and technology tags
+- `politics` strengthens politics mode scoring
+- gaming domain terms such as `Nintendo`, `Switch`, `console`, `PS5`, `GTA`, `trailer`, and `game` can still override a broad PyTorch sports/general prediction
+
+When `debug_analysis` is true, the response includes compact PyTorch article-level predictions under `analysis_debug`.
 
 ## Model Design
 
@@ -103,5 +130,6 @@ The prediction script prints:
 - AG News provides broad topic categories, not detailed NewsBoardAI event labels.
 - Project-labeled data is still small, so project-specific labels may be weak.
 - Class imbalance can affect predictions.
-- This model is not integrated into the live dashboard yet.
+- The model is only a broad topic signal in the live dashboard.
+- Specific event tags still come from hybrid/domain aggregation.
 - Trained files under `models/` and datasets under `data/` are local artifacts and should not be committed.

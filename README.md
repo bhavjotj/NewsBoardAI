@@ -50,7 +50,7 @@ The backend keeps the response shape small and dashboard-friendly. If local ML m
 | Frontend | React, TypeScript, Vite, Tailwind CSS, lucide-react |
 | Extension | Chrome Extension Manifest V3, Chrome Side Panel API |
 | News/Data | Google News RSS, local JSONL examples, optional local CSV datasets |
-| ML Baseline | scikit-learn, TF-IDF, Logistic Regression, joblib |
+| ML | scikit-learn, TF-IDF, Logistic Regression, PyTorch, EmbeddingBag, joblib |
 
 ## Project Structure
 
@@ -144,7 +144,9 @@ This is local-only and does not require a Chrome Web Store login.
 
 ## ML Baseline Usage
 
-NewsBoardAI supports lightweight local baseline models. The current baseline uses TF-IDF features with Logistic Regression classifiers for sentiment, event tags, and topic/mode prediction.
+NewsBoardAI supports lightweight local baseline models. The scikit-learn baseline uses TF-IDF features with Logistic Regression classifiers for sentiment, event tags, and topic/mode prediction.
+
+The project also includes an optional PyTorch neural broad-topic classifier. The live dashboard can use it as a supporting signal through `use_torch: true`, while the hybrid analyzer still handles specific event tags and rule-based fallbacks.
 
 Models are trained locally and saved under:
 
@@ -180,6 +182,16 @@ PYTHONPATH=apps/api .venv/bin/python apps/api/scripts/predict_baseline.py \
   --snippet "Revenue growth and pricing updates drew investor attention."
 ```
 
+Train the optional PyTorch broad-topic model:
+
+```bash
+PYTHONPATH=apps/api .venv/bin/python apps/api/scripts/train_torch_event_model.py \
+  --project-data data/labeled/news_labeled.jsonl \
+  --topic-data data/external/ag_news.csv \
+  --output-dir models/torch_event \
+  --max-rows 10000
+```
+
 ## Example API Request
 
 ```bash
@@ -189,7 +201,8 @@ curl -X POST "http://127.0.0.1:8000/api/news/dashboard" \
     "query": "Tesla",
     "max_results": 3,
     "use_real_news": true,
-    "use_ml": true
+    "use_ml": true,
+    "use_torch": true
   }'
 ```
 
@@ -201,7 +214,7 @@ The response includes fields such as `topic`, `data_source`, `detected_mode`, `o
 - Google News RSS is used lightly for local MVP news retrieval.
 - Analysis is signal-based and not guaranteed.
 - Financial dashboard output is not financial advice.
-- Baseline ML models are not final deep learning or transformer models.
+- Baseline ML and PyTorch models are not final transformer models.
 - External datasets can improve coverage, but labels may not perfectly match NewsBoardAI's dashboard concepts.
 - `data/external/`, `data/raw/`, `data/labeled/`, and `models/` are intentionally not committed.
 

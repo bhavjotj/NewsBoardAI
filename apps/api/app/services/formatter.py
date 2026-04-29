@@ -22,6 +22,8 @@ def format_dashboard_response(
     detected_mode: DashboardMode,
     analysis_source: AnalysisSource,
     analysis_debug: dict | None = None,
+    torch_used: bool | None = None,
+    torch_available: bool | None = None,
 ) -> DashboardResponse:
     return DashboardResponse(
         topic=request.query,
@@ -48,6 +50,8 @@ def format_dashboard_response(
         ],
         confidence=analysis.confidence,
         possible_impact=analysis.possible_impact,
+        torch_used=torch_used,
+        torch_available=torch_available,
         analysis_debug=analysis_debug,
     )
 

@@ -35,6 +35,10 @@ export function DashboardView({ dashboard, lastUpdated }: DashboardViewProps) {
 
         <div className="mt-3 flex flex-wrap gap-2">
           <Badge tone="info">{formatLabel(dashboard.data_source)}</Badge>
+          {dashboard.analysis_source && (
+            <Badge tone="info">{formatLabel(dashboard.analysis_source)}</Badge>
+          )}
+          {dashboard.torch_used && <Badge tone="info">neural topic</Badge>}
           <Badge>{dashboard.detected_mode}</Badge>
           <Badge tone={tone}>{dashboard.overall_signal}</Badge>
           <Badge tone={confidenceTone(dashboard.confidence)}>

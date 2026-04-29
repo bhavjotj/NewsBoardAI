@@ -12,6 +12,11 @@ from app.services.baseline_predictor import (
     normalized_tokens,
 )
 from app.services.fetchers import NewsArticle
+from app.services.torch_topic_service import (
+    TorchTopicPrediction,
+    TorchTopicService,
+    get_torch_topic_service,
+)
 
 SENTIMENT_SCORE = {
     "positive": 1.0,
@@ -20,12 +25,37 @@ SENTIMENT_SCORE = {
     "mixed": 0.0,
 }
 CONFIDENCE_THRESHOLD = 0.55
+TORCH_CONFIDENCE_THRESHOLD = 0.45
+TECH_TERMS = {
+    "ai",
+    "artificial",
+    "intelligence",
+    "tech",
+    "technology",
+    "software",
+    "ios",
+    "app",
+    "apps",
+    "cloud",
+    "chip",
+    "chips",
+    "device",
+    "devices",
+    "iphone",
+    "airpods",
+    "update",
+    "updates",
+}
 
 MODE_LEXICONS = {
     DashboardMode.BUSINESS: {
         *DOMAIN_LEXICONS["finance_market_terms"],
         "ai",
         "business",
+        "apple",
+        "tesla",
+        "netflix",
+        "nvidia",
         "shopify",
         "microsoft",
         "meta",
@@ -44,6 +74,9 @@ TAG_LEXICONS = {
     "risk": DOMAIN_LEXICONS["negative_risk_terms"],
     "product": {"product", "menu", "drink", "drinks", "food", "store", "device"},
     "launch": DOMAIN_LEXICONS["product_launch_terms"],
+    "update": {"update", "updates", "upgrade", "software", "ios", "app", "apps"},
+    "ai": {"ai", "artificial", "intelligence", "model", "models", "tools"},
+    "tech": TECH_TERMS,
     "health": {"health", "healthy", "illness", "nutrition", "food"},
     "gaming": DOMAIN_LEXICONS["gaming_terms"],
     "politics": DOMAIN_LEXICONS["politics_policy_terms"],
@@ -63,6 +96,8 @@ class HybridAnalysisResult:
     detected_mode: DashboardMode
     analysis_source: AnalysisSource
     debug: dict | None = None
+    torch_used: bool = False
+    torch_available: bool = False
 
 
 def analyze_with_hybrid_ml(
@@ -71,16 +106,21 @@ def analyze_with_hybrid_ml(
     fallback_mode: DashboardMode,
     predictor: BaselinePredictor | None = None,
     include_debug: bool = False,
+    use_torch: bool = True,
+    torch_service: TorchTopicService | None = None,
 ) -> HybridAnalysisResult:
     predictor = predictor or BaselinePredictor()
-    if not predictor.models:
+    torch_service = torch_service or get_torch_topic_service()
+    torch_available = bool(use_torch and torch_service.available)
+    if not predictor.models and not torch_available:
         return _fallback(articles, fallback_mode, AnalysisSource.RULE_BASED)
 
     try:
         predictions = [
             predictor.predict(title=article.title, snippet=article.snippet)
             for article in articles
-        ]
+        ] if predictor.models else []
+        torch_predictions = _torch_predictions(articles, use_torch, torch_service)
     except Exception as error:
         result = _fallback(articles, fallback_mode, AnalysisSource.HYBRID_ML_FALLBACK)
         if include_debug:
@@ -89,20 +129,39 @@ def analyze_with_hybrid_ml(
                 result.detected_mode,
                 result.analysis_source,
                 {"aggregation_notes": [f"Hybrid prediction failed: {error}"]},
+                torch_used=False,
+                torch_available=torch_available,
             )
         return result
 
-    if not predictions:
+    torch_used = any(prediction.label for prediction in torch_predictions)
+    if not predictions and not torch_used:
         return _fallback(articles, fallback_mode, AnalysisSource.HYBRID_ML_FALLBACK)
 
     context = _context(query, articles)
-    mode_scores = _mode_scores(query, context, predictions, fallback_mode)
+    mode_scores = _mode_scores(
+        query,
+        context,
+        predictions,
+        fallback_mode,
+        torch_predictions,
+    )
     detected_mode = max(mode_scores.items(), key=lambda item: item[1])[0]
     sentiment_label, sentiment_score, sentiment_notes = _sentiment(context, predictions)
     event_tags, dropped_tags, tag_scores = _event_tags(
-        query, context, predictions, detected_mode
+        query,
+        context,
+        predictions,
+        detected_mode,
+        torch_predictions,
     )
-    confidence = _confidence(predictions, detected_mode, event_tags, sentiment_label)
+    confidence = _confidence(
+        predictions,
+        detected_mode,
+        event_tags,
+        sentiment_label,
+        torch_predictions,
+    )
     analysis = DashboardAnalysis(
         sentiment_label=sentiment_label,
         sentiment_score=sentiment_score,
@@ -120,18 +179,40 @@ def analyze_with_hybrid_ml(
                 result.analysis,
                 result.detected_mode,
                 result.analysis_source,
-                _debug(predictions, dropped_tags, tag_scores, mode_scores, ["Low hybrid confidence; used rule fallback."]),
+                _debug(
+                    predictions,
+                    dropped_tags,
+                    tag_scores,
+                    mode_scores,
+                    ["Low hybrid confidence; used rule fallback."],
+                    torch_predictions,
+                    torch_available,
+                    torch_used,
+                ),
+                torch_used=torch_used,
+                torch_available=torch_available,
             )
         return result
 
     debug = None
     if include_debug:
-        debug = _debug(predictions, dropped_tags, tag_scores, mode_scores, sentiment_notes)
+        debug = _debug(
+            predictions,
+            dropped_tags,
+            tag_scores,
+            mode_scores,
+            sentiment_notes,
+            torch_predictions,
+            torch_available,
+            torch_used,
+        )
     return HybridAnalysisResult(
         analysis=analysis,
         detected_mode=detected_mode,
         analysis_source=AnalysisSource.HYBRID_ML,
         debug=debug,
+        torch_used=torch_used,
+        torch_available=torch_available,
     )
 
 
@@ -148,11 +229,25 @@ def _fallback(
     )
 
 
+def _torch_predictions(
+    articles: list[NewsArticle],
+    use_torch: bool,
+    torch_service: TorchTopicService,
+) -> list[TorchTopicPrediction]:
+    if not use_torch or not torch_service.available:
+        return []
+    return [
+        torch_service.predict(title=article.title, snippet=article.snippet)
+        for article in articles
+    ]
+
+
 def _mode_scores(
     query: str,
     context: str,
     predictions: list[BaselinePredictionResult],
     fallback_mode: DashboardMode,
+    torch_predictions: list[TorchTopicPrediction],
 ) -> dict[DashboardMode, float]:
     query_tokens = normalized_tokens(query)
     context_tokens = normalized_tokens(context)
@@ -172,6 +267,21 @@ def _mode_scores(
             if confidence < 0.45 and support == 0:
                 continue
             scores[mode] += 1.5 * confidence
+
+    for prediction in torch_predictions:
+        mode = _torch_mode(prediction.label)
+        if mode is None:
+            continue
+        confidence = prediction.confidence or 0.0
+        support = len(context_tokens & MODE_LEXICONS.get(mode, set()))
+        if confidence < TORCH_CONFIDENCE_THRESHOLD and support == 0:
+            continue
+        scores[mode] += 2.0 * max(confidence, 0.35)
+
+    if _tech_support(context_tokens):
+        scores[DashboardMode.GENERAL] += 0.8
+        if context_tokens & MODE_LEXICONS[DashboardMode.BUSINESS]:
+            scores[DashboardMode.BUSINESS] += 0.8
     return scores
 
 
@@ -219,6 +329,7 @@ def _event_tags(
     context: str,
     predictions: list[BaselinePredictionResult],
     detected_mode: DashboardMode,
+    torch_predictions: list[TorchTopicPrediction],
 ) -> tuple[list[str], list[str], dict[str, float]]:
     query_tokens = normalized_tokens(query)
     context_tokens = normalized_tokens(context)
@@ -228,6 +339,19 @@ def _event_tags(
     for tag, terms in TAG_LEXICONS.items():
         scores[tag] += 2.0 * len(query_tokens & terms)
         scores[tag] += 0.8 * len(context_tokens & terms)
+
+    for prediction in torch_predictions:
+        confidence = prediction.confidence or 0.0
+        if confidence < TORCH_CONFIDENCE_THRESHOLD:
+            continue
+        if prediction.label == "tech":
+            scores["tech"] += 1.2 * confidence
+            if context_tokens & TAG_LEXICONS["ai"]:
+                scores["ai"] += 1.5
+            if context_tokens & (TAG_LEXICONS["product"] | TAG_LEXICONS["update"]):
+                scores["product"] += 1.0
+        elif prediction.label in {"business", "sports", "politics"}:
+            scores[prediction.label] += 0.6 * confidence
 
     for prediction in predictions:
         tag = prediction.event_tag.label
@@ -269,12 +393,18 @@ def _confidence(
     detected_mode: DashboardMode,
     event_tags: list[str],
     sentiment_label: str,
+    torch_predictions: list[TorchTopicPrediction],
 ) -> str:
-    source_count = len(predictions)
+    source_count = max(len(predictions), len(torch_predictions))
     topic_labels = [
         prediction.topic_mode.label
         for prediction in predictions
         if prediction.topic_mode.label
+    ]
+    torch_labels = [
+        _torch_mode(prediction.label).value
+        for prediction in torch_predictions
+        if _torch_mode(prediction.label) is not None
     ]
     sentiment_labels = [
         prediction.sentiment.label
@@ -282,8 +412,16 @@ def _confidence(
         if prediction.sentiment.label
     ]
     confidences = _usable_confidences(predictions)
+    confidences.extend(
+        prediction.confidence
+        for prediction in torch_predictions
+        if prediction.confidence is not None
+    )
     average_confidence = sum(confidences) / len(confidences) if confidences else 0.0
-    topic_agreement = _agreement(topic_labels, detected_mode.value)
+    topic_agreement = max(
+        _agreement(topic_labels, detected_mode.value),
+        _agreement(torch_labels, detected_mode.value),
+    )
     sentiment_agreement = _agreement(sentiment_labels, sentiment_label)
 
     score = 0
@@ -325,6 +463,22 @@ def _usable_confidences(predictions: list[BaselinePredictionResult]) -> list[flo
             if label_prediction.confidence is not None:
                 confidences.append(label_prediction.confidence)
     return confidences
+
+
+def _torch_mode(label: str | None) -> DashboardMode | None:
+    if label == "business":
+        return DashboardMode.BUSINESS
+    if label == "sports":
+        return DashboardMode.SPORTS
+    if label == "politics":
+        return DashboardMode.POLITICS
+    if label == "general":
+        return DashboardMode.GENERAL
+    return None
+
+
+def _tech_support(tokens: set[str]) -> bool:
+    return bool(tokens & TECH_TERMS)
 
 
 def _strong_domain_agreement(mode_scores: dict[DashboardMode, float]) -> bool:
@@ -397,6 +551,9 @@ def _debug(
     tag_scores: dict[str, float],
     mode_scores: dict[DashboardMode, float],
     aggregation_notes: list[str],
+    torch_predictions: list[TorchTopicPrediction],
+    torch_available: bool,
+    torch_used: bool,
 ) -> dict:
     return {
         "articles": [
@@ -409,6 +566,20 @@ def _debug(
                 "adjustments": prediction.adjustments,
             }
             for prediction in predictions
+        ],
+        "torch_available": torch_available,
+        "torch_used": torch_used,
+        "torch_predictions": [
+            {
+                "label": prediction.label,
+                "confidence": prediction.confidence,
+                "top_labels": [
+                    label.__dict__ for label in prediction.top_labels
+                ],
+                "available": prediction.available,
+                "error": prediction.error,
+            }
+            for prediction in torch_predictions
         ],
         "dropped_low_confidence_tags": sorted(set(dropped_tags)),
         "tag_scores": {key: round(value, 2) for key, value in tag_scores.items()},

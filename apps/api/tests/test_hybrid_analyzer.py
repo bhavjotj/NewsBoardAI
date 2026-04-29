@@ -7,6 +7,7 @@ from app.services.baseline_predictor import (
 )
 from app.services.fetchers import NewsArticle
 from app.services.hybrid_analyzer import analyze_with_hybrid_ml
+from app.services.torch_topic_service import TorchTopicLabel, TorchTopicPrediction
 
 
 class FakePredictor:
@@ -15,6 +16,18 @@ class FakePredictor:
     def __init__(self, predictions):
         self.predictions = predictions
         self.index = 0
+
+    def predict(self, title: str, snippet: str = ""):
+        prediction = self.predictions[self.index]
+        self.index += 1
+        return prediction
+
+
+class FakeTorchService:
+    def __init__(self, predictions, available=True):
+        self.predictions = predictions
+        self.index = 0
+        self.available = available
 
     def predict(self, title: str, snippet: str = ""):
         prediction = self.predictions[self.index]
@@ -48,6 +61,15 @@ def prediction(
         raw_predictions={},
         notes=[],
         adjustments=[],
+    )
+
+
+def torch_prediction(label: str, confidence: float = 0.85) -> TorchTopicPrediction:
+    return TorchTopicPrediction(
+        label=label,
+        confidence=confidence,
+        top_labels=[TorchTopicLabel(label=label, confidence=confidence)],
+        available=True,
     )
 
 
@@ -170,3 +192,115 @@ def test_repeated_source_agreement_raises_confidence_to_medium() -> None:
 
     assert result.detected_mode == DashboardMode.SPORTS
     assert result.analysis.confidence in {"medium", "high"}
+
+
+def test_use_torch_false_skips_torch_mode_signal() -> None:
+    articles = [
+        article("Neutral civic update", "Local coverage has few domain signals."),
+        article("General public notice", "Officials shared a short update."),
+    ]
+    predictions = [
+        prediction(event="general", topic="general"),
+        prediction(event="general", topic="general"),
+    ]
+
+    result = analyze_with_hybrid_ml(
+        query="local update",
+        articles=articles,
+        fallback_mode=DashboardMode.GENERAL,
+        predictor=FakePredictor(predictions),
+        torch_service=FakeTorchService([torch_prediction("sports"), torch_prediction("sports")]),
+        use_torch=False,
+    )
+
+    assert result.detected_mode == DashboardMode.GENERAL
+    assert not result.torch_used
+
+
+def test_torch_sports_prediction_strengthens_sports_mode() -> None:
+    articles = [
+        article("Hockey matchup preview", "Players prepare for a close game."),
+        article("Playoff picks shift", "Team form and odds drive coverage."),
+    ]
+    predictions = [
+        prediction(event="general", topic="general", event_conf=0.2, topic_conf=0.2),
+        prediction(event="general", topic="general", event_conf=0.2, topic_conf=0.2),
+    ]
+
+    result = analyze_with_hybrid_ml(
+        query="hockey",
+        articles=articles,
+        fallback_mode=DashboardMode.GENERAL,
+        predictor=FakePredictor(predictions),
+        torch_service=FakeTorchService([torch_prediction("sports"), torch_prediction("sports")]),
+    )
+
+    assert result.detected_mode == DashboardMode.SPORTS
+    assert "sports" in result.analysis.event_tags
+    assert result.torch_used
+
+
+def test_torch_business_prediction_strengthens_business_mode() -> None:
+    articles = [
+        article("Company shares rise", "Investors watch revenue and earnings."),
+        article("Analysts discuss market demand", "Stock coverage remains active."),
+    ]
+    predictions = [
+        prediction(event="general", topic="general", event_conf=0.2, topic_conf=0.2),
+        prediction(event="general", topic="general", event_conf=0.2, topic_conf=0.2),
+    ]
+
+    result = analyze_with_hybrid_ml(
+        query="company stock",
+        articles=articles,
+        fallback_mode=DashboardMode.GENERAL,
+        predictor=FakePredictor(predictions),
+        torch_service=FakeTorchService([torch_prediction("business"), torch_prediction("business")]),
+    )
+
+    assert result.detected_mode == DashboardMode.BUSINESS
+    assert "business" in result.analysis.event_tags
+
+
+def test_torch_tech_prediction_supports_product_ai_tags() -> None:
+    articles = [
+        article("Apple AI tools arrive in iOS update", "Software features expand across devices."),
+        article("AirPods update highlights Apple Intelligence", "Product coverage focuses on AI tools."),
+    ]
+    predictions = [
+        prediction(event="general", topic="general", event_conf=0.2, topic_conf=0.2),
+        prediction(event="general", topic="general", event_conf=0.2, topic_conf=0.2),
+    ]
+
+    result = analyze_with_hybrid_ml(
+        query="Apple AI tools",
+        articles=articles,
+        fallback_mode=DashboardMode.GENERAL,
+        predictor=FakePredictor(predictions),
+        torch_service=FakeTorchService([torch_prediction("tech"), torch_prediction("tech")]),
+    )
+
+    assert {"ai", "product", "tech"} & set(result.analysis.event_tags)
+    assert result.analysis.event_tags != ["general"]
+
+
+def test_gaming_domain_evidence_overrides_torch_sports_prediction() -> None:
+    articles = [
+        article("Nintendo Switch 2 review roundup", "Console previews and game coverage grow."),
+        article("GTA trailer details spark player interest", "Gaming fans watch release timing."),
+    ]
+    predictions = [
+        prediction(event="general", topic="general", event_conf=0.2, topic_conf=0.2),
+        prediction(event="general", topic="general", event_conf=0.2, topic_conf=0.2),
+    ]
+
+    result = analyze_with_hybrid_ml(
+        query="Nintendo Switch 2",
+        articles=articles,
+        fallback_mode=DashboardMode.GENERAL,
+        predictor=FakePredictor(predictions),
+        torch_service=FakeTorchService([torch_prediction("sports"), torch_prediction("sports")]),
+    )
+
+    assert result.detected_mode == DashboardMode.GAMING
+    assert "gaming" in result.analysis.event_tags

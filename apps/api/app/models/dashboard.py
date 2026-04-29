@@ -34,6 +34,7 @@ class DashboardRequest(BaseModel):
     use_real_news: bool = True
     save_examples: bool = False
     use_ml: bool = True
+    use_torch: bool = True
     debug_analysis: bool = False
 
     @field_validator("query")
@@ -71,4 +72,6 @@ class DashboardResponse(BaseModel):
     sources: list[SourceCard]
     confidence: str
     possible_impact: str
+    torch_used: Optional[bool] = None
+    torch_available: Optional[bool] = None
     analysis_debug: Optional[dict[str, Any]] = None

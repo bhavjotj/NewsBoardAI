@@ -1,4 +1,5 @@
 export type DataSource = "mock" | "google_news_rss" | "fallback_mock";
+export type AnalysisSource = "rule_based" | "hybrid_ml" | "hybrid_ml_fallback";
 
 export type DashboardMode =
   | "general"
@@ -25,6 +26,7 @@ export interface SourceCardData {
 export interface DashboardResponse {
   topic: string;
   data_source: DataSource;
+  analysis_source?: AnalysisSource;
   detected_mode: DashboardMode;
   time_window: string;
   overall_signal: string;
@@ -34,6 +36,8 @@ export interface DashboardResponse {
   sources: SourceCardData[];
   confidence: "low" | "medium" | "high";
   possible_impact: string;
+  torch_used?: boolean;
+  torch_available?: boolean;
 }
 
 export interface DashboardRequest {
@@ -41,4 +45,5 @@ export interface DashboardRequest {
   max_results: number;
   use_real_news: true;
   use_ml: true;
+  use_torch: true;
 }

@@ -141,5 +141,6 @@ confidence values when available, and any post-processing notes.
 - Confidence values from small or mismatched datasets can be overconfident.
 - Lexicon post-processing can improve obvious cases, but it is not a substitute
   for a larger labeled NewsBoardAI dataset.
-- These models are not integrated into backend inference yet.
+- The scikit-learn baseline is integrated into the backend hybrid analyzer when
+  local model files are available.
 - This is still not the final neural network or transformer stage.
