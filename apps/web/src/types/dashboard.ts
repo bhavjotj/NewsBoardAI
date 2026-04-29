@@ -40,4 +40,5 @@ export interface DashboardRequest {
   query: string;
   max_results: number;
   use_real_news: true;
+  use_ml: true;
 }

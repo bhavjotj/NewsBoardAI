@@ -37,6 +37,7 @@ function App() {
         query,
         max_results: maxResults,
         use_real_news: true,
+        use_ml: true,
       });
       setDashboard(result);
       setLastUpdated(new Date());

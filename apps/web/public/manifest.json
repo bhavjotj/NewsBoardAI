@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "NewsBoardAI",
+  "version": "0.1.0",
+  "description": "Local AI news dashboard side panel.",
+  "action": {
+    "default_title": "Open NewsBoardAI"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "index.html"
+  },
+  "permissions": ["sidePanel"],
+  "host_permissions": [
+    "http://127.0.0.1:8000/*",
+    "http://localhost:8000/*"
+  ]
+}
