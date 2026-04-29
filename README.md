@@ -2,7 +2,7 @@
 
 NewsBoardAI is a local-first AI/ML news intelligence dashboard. It fetches a small number of recent Google News RSS results for a topic and turns them into a compact visual brief with signal, sentiment, event tags, confidence, possible impact, and source cards.
 
-It runs as both a React web app and a local Chrome side-panel extension. It is not a full news website, a guaranteed prediction engine, or financial advice.
+It runs as both a React web app and a local Chrome side-panel extension.
 
 ## Project Overview
 
