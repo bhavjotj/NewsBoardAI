@@ -37,6 +37,5 @@ data/processed/
 *.onnx
 
 # Editor
-.cursor/*
-!.cursor/rules/
-!.cursor/rules/**
+AGENTS.md
+.cursor/
