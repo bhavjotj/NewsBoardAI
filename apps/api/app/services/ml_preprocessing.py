@@ -1,3 +1,4 @@
+# Purpose: Preprocesses the text for the machine learning models.
 from __future__ import annotations
 
 from app.utils.text import clean_text
@@ -7,6 +8,7 @@ MAX_TITLE_OVERLAP = 0.75
 
 
 def build_model_text(example: dict) -> str:
+    # Avoid training on duplicate title/snippet text from RSS-style feeds.
     title = clean_text(str(example.get("title", "")))
     snippet = clean_text(str(example.get("snippet", "")))
 

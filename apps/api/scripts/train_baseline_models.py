@@ -43,6 +43,7 @@ def main() -> None:
     project_examples = load_project_labeled_jsonl(args.project_data)
     args.model_dir.mkdir(parents=True, exist_ok=True)
 
+    # External sentiment data wins when provided; project labels still train events.
     sentiment_examples = sentiment_training_examples(args, project_examples, max_rows)
     train_and_save(
         name="sentiment",
@@ -94,6 +95,7 @@ def train_and_save(name: str, examples: list[dict], output_path: Path) -> None:
         return
 
     model = make_pipeline()
+    # Small local datasets are expected, so train without a split when needed.
     if can_split(labels):
         train_texts, test_texts, train_labels, test_labels = train_test_split(
             texts,

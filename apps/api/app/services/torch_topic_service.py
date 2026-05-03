@@ -1,3 +1,4 @@
+# Purpose: Torch topic service for the news dashboard. Predicts the topic mode for the news articles. Used in the hybrid ML model.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -72,6 +73,7 @@ class TorchTopicService:
             return self._predictor
 
         self._loaded = True
+        # Lazy-load once; missing local model files are a normal development state.
         try:
             from app.ml.torch_inference import TorchEventPredictor
 

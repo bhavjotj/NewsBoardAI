@@ -12,6 +12,7 @@ const KNOWN_WORDS: Record<string, string> = {
 };
 
 export function formatTopic(value: string) {
+  // Search text becomes a dashboard title, so preserve known product casing.
   return value
     .trim()
     .split(/\s+/)

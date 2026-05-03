@@ -1,6 +1,7 @@
+# Purpose: Hybrid ML model for the news dashboard. Combines the rule-based model with the baseline predictor and the torch topic service.
 from __future__ import annotations
 
-from collections import Counter, defaultdict
+from collections import defaultdict
 from dataclasses import dataclass
 
 from app.models.dashboard import AnalysisSource, DashboardMode
@@ -18,13 +19,9 @@ from app.services.torch_topic_service import (
     get_torch_topic_service,
 )
 
-SENTIMENT_SCORE = {
-    "positive": 1.0,
-    "negative": -1.0,
-    "neutral": 0.0,
-    "mixed": 0.0,
-}
+# Confidence threshold for the hybrid ML model.
 CONFIDENCE_THRESHOLD = 0.55
+# Confidence threshold for the torch topic service.
 TORCH_CONFIDENCE_THRESHOLD = 0.45
 TECH_TERMS = {
     "ai",
@@ -46,7 +43,7 @@ TECH_TERMS = {
     "update",
     "updates",
 }
-
+# Mode lexicons are words that are associated with a mode.
 MODE_LEXICONS = {
     DashboardMode.BUSINESS: {
         *DOMAIN_LEXICONS["finance_market_terms"],
@@ -65,6 +62,7 @@ MODE_LEXICONS = {
     DashboardMode.POLITICS: DOMAIN_LEXICONS["politics_policy_terms"],
 }
 
+# Tag lexicons are words that are associated with a tag.
 TAG_LEXICONS = {
     "sports": DOMAIN_LEXICONS["sports_terms"],
     "playoffs": {"playoff", "playoffs", "matchup", "series"},
@@ -82,6 +80,7 @@ TAG_LEXICONS = {
     "politics": DOMAIN_LEXICONS["politics_policy_terms"],
 }
 
+# Mode tags are words that are associated with a mode.
 MODE_TAGS = {
     DashboardMode.BUSINESS: "business",
     DashboardMode.SPORTS: "sports",
@@ -89,7 +88,7 @@ MODE_TAGS = {
     DashboardMode.POLITICS: "politics",
 }
 
-
+# The hybrid analysis result data class
 @dataclass(frozen=True)
 class HybridAnalysisResult:
     analysis: DashboardAnalysis
@@ -99,7 +98,8 @@ class HybridAnalysisResult:
     torch_used: bool = False
     torch_available: bool = False
 
-
+# Analyzes the articles with the hybrid ML model.
+# Main function. It tries ML analysis first, uses PyTorch if available, and falls back to rule-based logic if models are missing or confidence is too weak.
 def analyze_with_hybrid_ml(
     query: str,
     articles: list[NewsArticle],
@@ -109,19 +109,20 @@ def analyze_with_hybrid_ml(
     use_torch: bool = True,
     torch_service: TorchTopicService | None = None,
 ) -> HybridAnalysisResult:
+    # Blend local ML with domain signals; rule-based analysis remains the fallback.
     predictor = predictor or BaselinePredictor()
     torch_service = torch_service or get_torch_topic_service()
     torch_available = bool(use_torch and torch_service.available)
     if not predictor.models and not torch_available:
         return _fallback(articles, fallback_mode, AnalysisSource.RULE_BASED)
 
-    try:
+    try: # Try to predict the topics and events.
         predictions = [
             predictor.predict(title=article.title, snippet=article.snippet)
             for article in articles
         ] if predictor.models else []
         torch_predictions = _torch_predictions(articles, use_torch, torch_service)
-    except Exception as error:
+    except Exception as error: # If the prediction fails, use the fallback.
         result = _fallback(articles, fallback_mode, AnalysisSource.HYBRID_ML_FALLBACK)
         if include_debug:
             return HybridAnalysisResult(
@@ -133,11 +134,11 @@ def analyze_with_hybrid_ml(
                 torch_available=torch_available,
             )
         return result
-
+    # Check if the torch topic service was used.
     torch_used = any(prediction.label for prediction in torch_predictions)
     if not predictions and not torch_used:
         return _fallback(articles, fallback_mode, AnalysisSource.HYBRID_ML_FALLBACK)
-
+    # Calculate the mode scores.
     context = _context(query, articles)
     mode_scores = _mode_scores(
         query,
@@ -146,8 +147,11 @@ def analyze_with_hybrid_ml(
         fallback_mode,
         torch_predictions,
     )
+    # Detect the mode by the highest mode score.
     detected_mode = max(mode_scores.items(), key=lambda item: item[1])[0]
+    # Calculate the sentiment.
     sentiment_label, sentiment_score, sentiment_notes = _sentiment(context, predictions)
+    # Calculate the event tags
     event_tags, dropped_tags, tag_scores = _event_tags(
         query,
         context,
@@ -155,6 +159,7 @@ def analyze_with_hybrid_ml(
         detected_mode,
         torch_predictions,
     )
+    # Calculate the confidence.
     confidence = _confidence(
         predictions,
         detected_mode,
@@ -162,6 +167,7 @@ def analyze_with_hybrid_ml(
         sentiment_label,
         torch_predictions,
     )
+    # Create the dashboard analysis by the sentiment, event tags, confidence and possible impact.
     analysis = DashboardAnalysis(
         sentiment_label=sentiment_label,
         sentiment_score=sentiment_score,
@@ -171,7 +177,7 @@ def analyze_with_hybrid_ml(
         possible_impact=_possible_impact(sentiment_label, detected_mode, event_tags),
         brief=_brief(query, sentiment_label, detected_mode, event_tags),
     )
-
+    # If the confidence is low and the domain agreement is not strong, use the fallback.
     if confidence == "low" and not _strong_domain_agreement(mode_scores):
         result = _fallback(articles, fallback_mode, AnalysisSource.HYBRID_ML_FALLBACK)
         if include_debug:
@@ -193,7 +199,7 @@ def analyze_with_hybrid_ml(
                 torch_available=torch_available,
             )
         return result
-
+    # If the confidence is high and the domain agreement is strong, use the hybrid ML model.
     debug = None
     if include_debug:
         debug = _debug(
@@ -215,7 +221,7 @@ def analyze_with_hybrid_ml(
         torch_available=torch_available,
     )
 
-
+# Uses the rule-based model as a fallback.
 def _fallback(
     articles: list[NewsArticle],
     fallback_mode: DashboardMode,
@@ -228,7 +234,7 @@ def _fallback(
         debug=None,
     )
 
-
+# Predicts the topics and events with the torch topic service.
 def _torch_predictions(
     articles: list[NewsArticle],
     use_torch: bool,
@@ -241,7 +247,7 @@ def _torch_predictions(
         for article in articles
     ]
 
-
+# Calculates the mode scores.
 def _mode_scores(
     query: str,
     context: str,
@@ -253,11 +259,11 @@ def _mode_scores(
     context_tokens = normalized_tokens(context)
     scores = {mode: 0.0 for mode in DashboardMode}
     scores[fallback_mode] += 0.5
-
+    # Calculate the mode scores by the query and context tokens.
     for mode, terms in MODE_LEXICONS.items():
         scores[mode] += 3.0 * len(query_tokens & terms)
         scores[mode] += 1.0 * len(context_tokens & terms)
-
+    # Calculate the mode scores by the predictions.
     for prediction in predictions:
         label = prediction.topic_mode.label
         if label in DashboardMode._value2member_map_:
@@ -267,8 +273,9 @@ def _mode_scores(
             if confidence < 0.45 and support == 0:
                 continue
             scores[mode] += 1.5 * confidence
-
+    # Calculate the mode scores by the torch predictions.
     for prediction in torch_predictions:
+        # PyTorch is broad topic evidence only, never final event-tag authority.
         mode = _torch_mode(prediction.label)
         if mode is None:
             continue
@@ -284,7 +291,7 @@ def _mode_scores(
             scores[DashboardMode.BUSINESS] += 0.8
     return scores
 
-
+# Determines the sentiment for the articles by the predictions. It is a weighted sum of the positive and negative terms which are associated with the articles.
 def _sentiment(
     context: str,
     predictions: list[BaselinePredictionResult],
@@ -323,7 +330,7 @@ def _sentiment(
         return "mixed", score, ["Source sentiment conflicts."]
     return "neutral", score, notes
 
-
+# Determines the event tags for the articles by calculating the scores for the tags. Scores are the keyword count for the tags.
 def _event_tags(
     query: str,
     context: str,
@@ -375,7 +382,7 @@ def _event_tags(
     ]
     return sorted_tags[:4] or ["general"], dropped_tags, dict(scores)
 
-
+# Determines if the tag is allowed for the mode.
 def _tag_allowed_for_mode(
     tag: str,
     detected_mode: DashboardMode,
@@ -387,7 +394,8 @@ def _tag_allowed_for_mode(
         return scores[tag] >= 2.5
     return True
 
-
+# Determines the confidence for the articles by the predictions, torch predictions, sentiment and event tags.
+# It is a weighted sum of the predictions, torch predictions, sentiment and event tags.
 def _confidence(
     predictions: list[BaselinePredictionResult],
     detected_mode: DashboardMode,
@@ -444,14 +452,14 @@ def _confidence(
         return "medium"
     return "low"
 
-
+# Determines the agreement between the labels and the target.
 def _agreement(labels: list[str | None], target: str) -> float:
     usable = [label for label in labels if label]
     if not usable:
         return 0.0
     return usable.count(target) / len(usable)
 
-
+# Determines the usable confidences for the predictions.
 def _usable_confidences(predictions: list[BaselinePredictionResult]) -> list[float]:
     confidences = []
     for prediction in predictions:
@@ -464,7 +472,7 @@ def _usable_confidences(predictions: list[BaselinePredictionResult]) -> list[flo
                 confidences.append(label_prediction.confidence)
     return confidences
 
-
+# Determines the mode from the torch prediction.
 def _torch_mode(label: str | None) -> DashboardMode | None:
     if label == "business":
         return DashboardMode.BUSINESS
@@ -476,22 +484,22 @@ def _torch_mode(label: str | None) -> DashboardMode | None:
         return DashboardMode.GENERAL
     return None
 
-
+# Determines if the tech support is present.
 def _tech_support(tokens: set[str]) -> bool:
     return bool(tokens & TECH_TERMS)
 
-
+# Determines if the domain agreement is strong.
 def _strong_domain_agreement(mode_scores: dict[DashboardMode, float]) -> bool:
     top_score = max(mode_scores.values())
     return top_score >= 3.0
 
-
+# Determines the overall signal for the articles.
 def _overall_signal(sentiment_label: str) -> str:
     if sentiment_label == "neutral":
         return "unclear"
     return sentiment_label
 
-
+# Combines the query and the event tags into a brief.
 def _brief(
     query: str,
     sentiment_label: str,
@@ -507,7 +515,7 @@ def _brief(
         return f"{query} coverage is leaning positive around {theme}, but the signal is still based on recent headlines."
     return f"{query} coverage is mixed, with competing signals around {theme}."
 
-
+# Determines the possible impact for the articles.
 def _possible_impact(
     sentiment_label: str,
     detected_mode: DashboardMode,
@@ -530,7 +538,7 @@ def _possible_impact(
         return f"Mixed signal for {context}; compare source details around {theme}."
     return f"Impact on {context} is unclear from the current source set."
 
-
+# Combines the tags into a phrase.
 def _tag_phrase(tags: list[str]) -> str:
     useful_tags = [tag for tag in tags if tag != "general"][:3]
     if not useful_tags:
@@ -539,12 +547,12 @@ def _tag_phrase(tags: list[str]) -> str:
         return useful_tags[0]
     return ", ".join(useful_tags[:-1]) + f", and {useful_tags[-1]}"
 
-
+# Combines the query and the article text.
 def _context(query: str, articles: list[NewsArticle]) -> str:
     article_text = " ".join(f"{article.title} {article.snippet}" for article in articles)
     return f"{query} {article_text}".lower()
 
-
+# Creates the debug dictionary.
 def _debug(
     predictions: list[BaselinePredictionResult],
     dropped_tags: list[str],

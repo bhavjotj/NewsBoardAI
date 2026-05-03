@@ -39,6 +39,7 @@ class TorchEventPredictor:
 
     @classmethod
     def from_model_dir(cls, model_dir: Path) -> "TorchEventPredictor | None":
+        # Return None instead of raising so backend inference can fail open.
         model_path = model_dir / "model.pt"
         metadata_path = model_dir / "metadata.json"
         if not model_path.exists() or not metadata_path.exists():

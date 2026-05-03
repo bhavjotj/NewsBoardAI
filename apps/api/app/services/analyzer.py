@@ -1,3 +1,4 @@
+# Purpose: Analyzes the news articles and detects the mode of the news. Fallback + Safety Net for the hybrid ML model.
 from dataclasses import dataclass
 from re import escape, search, sub
 from typing import Optional
@@ -5,6 +6,7 @@ from typing import Optional
 from app.models.dashboard import DashboardMode
 from app.services.fetchers import NewsArticle
 
+# Positive terms are words that are associated with positive sentiment
 POSITIVE_TERMS = {
     "beats expectations": 1.0,
     "better than expected": 0.9,
@@ -20,6 +22,7 @@ POSITIVE_TERMS = {
     "win": 0.5,
 }
 
+# Negative terms are words that are associated with negative sentiment
 NEGATIVE_TERMS = {
     "misses expectations": 1.0,
     "weaker than expected": 0.9,
@@ -37,6 +40,7 @@ NEGATIVE_TERMS = {
     "weak": 0.5,
 }
 
+# Event keywords are words that are associated with an event
 EVENT_KEYWORDS = {
     "earnings": {"earnings", "revenue", "profit", "quarterly results"},
     "product": {"product", "device", "hardware", "feature", "update"},
@@ -63,6 +67,7 @@ EVENT_KEYWORDS = {
     "risk": {"risk", "delay", "warning", "concern", "uncertain", "weak"},
 }
 
+# Mode keywords are words that are associated with a mode
 MODE_KEYWORDS = {
     DashboardMode.BUSINESS: {
         "stock",
@@ -115,6 +120,7 @@ MODE_KEYWORDS = {
     },
 }
 
+# Mode tags are words that are associated with a mode
 MODE_TAGS = {
     DashboardMode.BUSINESS: "market",
     DashboardMode.SPORTS: "sports",
@@ -122,7 +128,7 @@ MODE_TAGS = {
     DashboardMode.POLITICS: "politics",
 }
 
-
+# The dashboard analysis data class
 @dataclass(frozen=True)
 class DashboardAnalysis:
     sentiment_label: str
@@ -133,7 +139,7 @@ class DashboardAnalysis:
     possible_impact: str
     brief: Optional[str] = None
 
-
+# Analyzes the articles and returns a DashboardAnalysis object
 def analyze_articles(
     articles: list[NewsArticle], mode: DashboardMode
 ) -> DashboardAnalysis:
@@ -153,7 +159,7 @@ def analyze_articles(
         possible_impact=_possible_impact(sentiment_label, mode),
     )
 
-
+# Detects the mode of the news
 def detect_mode(query: str, articles: list[NewsArticle]) -> DashboardMode:
     text = " ".join([query.lower(), *[_article_text(article) for article in articles]])
     scores = {
@@ -165,7 +171,7 @@ def detect_mode(query: str, articles: list[NewsArticle]) -> DashboardMode:
         return DashboardMode.GENERAL
     return best_mode
 
-
+# Calculates the sentiment score for an article. It is a weighted sum of the positive and negative terms which are associated with the article.
 def _article_sentiment_score(article: NewsArticle) -> float:
     text = _article_text(article)
     positive_score = _weighted_keyword_score(text, POSITIVE_TERMS)
@@ -176,13 +182,13 @@ def _article_sentiment_score(article: NewsArticle) -> float:
     raw_score = (positive_score - negative_score) / total_score
     return round(max(-1.0, min(1.0, raw_score)), 2)
 
-
+# Calculates the sentiment score for a list of articles. It is the average of the sentiment scores for the articles.
 def _sentiment_score(article_scores: list[float]) -> float:
     if not article_scores:
         return 0.0
     return round(sum(article_scores) / len(article_scores), 2)
 
-
+# Determines the sentiment label for the articles. It is the label with the highest confidence.
 def _sentiment_label(score: float, article_scores: list[float]) -> str:
     positive_count = sum(1 for value in article_scores if value >= 0.25)
     negative_count = sum(1 for value in article_scores if value <= -0.25)
@@ -194,7 +200,7 @@ def _sentiment_label(score: float, article_scores: list[float]) -> str:
         return "negative"
     return "neutral"
 
-
+# Determines the event tags for the articles. It is the tags with the highest keyword count.
 def _event_tags(text: str, mode: DashboardMode) -> list[str]:
     tag_scores = [
         (tag, _keyword_count(text, keywords))
@@ -210,7 +216,7 @@ def _event_tags(text: str, mode: DashboardMode) -> list[str]:
         tags.insert(0, mode_tag)
     return tags[:4] or ["general"]
 
-
+# Determines the confidence level for the articles, which means how confident we are in the analysis.
 def _confidence(
     articles: list[NewsArticle],
     article_scores: list[float],
@@ -239,13 +245,13 @@ def _confidence(
         return "medium"
     return "low"
 
-
+# Determines the overall signal for the articles. It is the sentiment label if it is not neutral or general, otherwise it is unclear.
 def _overall_signal(sentiment_label: str, event_tags: list[str]) -> str:
     if sentiment_label == "neutral" and event_tags == ["general"]:
         return "unclear"
     return sentiment_label
 
-
+# Determines the possible impact for the articles. It is the impact with the highest keyword count.
 def _possible_impact(sentiment_label: str, mode: DashboardMode) -> str:
     contexts = {
         DashboardMode.BUSINESS: "market and business attention",
@@ -268,26 +274,26 @@ def _possible_impact(sentiment_label: str, mode: DashboardMode) -> str:
         return f"Mixed signal for {context}; compare source details before drawing conclusions."
     return f"Impact on {context} is unclear from the current small source set."
 
-
+# Combines the title and snippet of the article into a single string.
 def _article_text(article: NewsArticle) -> str:
     return f"{article.title} {article.snippet}".lower()
 
-
+# Calculates the weighted keyword score for an article. It is a weighted sum of the positive and negative terms which are associated with the article.
 def _weighted_keyword_score(text: str, weighted_terms: dict[str, float]) -> float:
     return round(
         sum(weight for term, weight in weighted_terms.items() if _has_term(text, term)),
         2,
     )
 
-
+# Calculates the keyword count for a string. It is the number of terms that are associated with the string.
 def _keyword_count(text: str, terms: set[str]) -> int:
     return sum(1 for term in terms if _has_term(text, term))
 
-
+# Checks if a term is associated with a string.
 def _has_term(text: str, term: str) -> bool:
     return search(rf"\b{escape(term)}\b", text) is not None
 
-
+# Calculates the duplicate ratio for a list of articles. 
 def _duplicate_ratio(articles: list[NewsArticle]) -> float:
     if len(articles) < 2:
         return 0.0
@@ -296,7 +302,7 @@ def _duplicate_ratio(articles: list[NewsArticle]) -> float:
     duplicate_count = len(fingerprints) - len(set(fingerprints))
     return duplicate_count / len(fingerprints)
 
-
+# Calculates the fingerprint for an article. It is a string of the most important words in the article.
 def _fingerprint(value: str) -> str:
     words = sub(r"[^a-z0-9\s]", " ", value.lower()).split()
     useful_words = [

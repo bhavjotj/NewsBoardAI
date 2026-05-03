@@ -167,6 +167,7 @@ def train_and_save(
 
     train_dataset = dataset
     validation_dataset = None
+    # Only split when each class has enough examples to make validation meaningful.
     if can_validate(examples):
         validation_size = max(1, int(len(dataset) * 0.2))
         train_size = len(dataset) - validation_size

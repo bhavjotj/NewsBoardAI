@@ -1,3 +1,4 @@
+# Purpose: Baseline predictor for the news dashboard in which it predicts the sentiment, event tags and topic mode for a news article
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -136,13 +137,13 @@ DOMAIN_LEXICONS = {
     },
 }
 
-
+# Stores one predicted label and its confidence.
 @dataclass(frozen=True)
 class LabelPrediction:
     label: str | None
     confidence: float | None = None
 
-
+# Stores all predictions for an article, including raw predictions, notes, and adjustments.
 @dataclass(frozen=True)
 class BaselinePredictionResult:
     input_text: str
@@ -153,7 +154,7 @@ class BaselinePredictionResult:
     notes: list[str] = field(default_factory=list)
     adjustments: list[str] = field(default_factory=list)
 
-
+# Main class that loads baseline models and predicts for a title/snippet.
 class BaselinePredictor:
     def __init__(
         self,
@@ -161,9 +162,10 @@ class BaselinePredictor:
         models: dict[str, object] | None = None,
     ) -> None:
         self.models = models if models is not None else load_models(model_dir)
-
+    # Predicts the sentiment, event tags and topic mode for the news articles by the title and snippet.
     def predict(self, title: str, snippet: str = "") -> BaselinePredictionResult:
         input_text = build_model_text({"title": title, "snippet": snippet})
+        # Model outputs stay visible; domain adjustments are layered after them.
         raw_predictions = {
             "sentiment": predict_with_confidence(
                 self.models.get("sentiment"), input_text
@@ -196,7 +198,7 @@ class BaselinePredictor:
             adjustments=adjustments,
         )
 
-
+# Loads the models from the model directory.
 def load_models(model_dir: Path) -> dict[str, object]:
     model_files = {
         "sentiment": model_dir / "sentiment_model.joblib",
@@ -210,7 +212,7 @@ def load_models(model_dir: Path) -> dict[str, object]:
             models[name] = artifact.get("model", artifact)
     return models
 
-
+# Runs the model and gets probability/confidence if supported.
 def predict_with_confidence(model: object | None, input_text: str) -> LabelPrediction:
     if model is None:
         return LabelPrediction(label=None, confidence=None)
@@ -223,7 +225,7 @@ def predict_with_confidence(model: object | None, input_text: str) -> LabelPredi
         return LabelPrediction(label=label, confidence=round(confidence, 3))
     return LabelPrediction(label=label, confidence=None)
 
-
+# Adjusts low-confidence sentiment using broad positive/risk concepts.
 def adjust_sentiment(
     input_text: str, prediction: LabelPrediction
 ) -> tuple[LabelPrediction, str | None]:
@@ -257,7 +259,7 @@ def adjust_sentiment(
         )
     return prediction, None
 
-
+# Adjusts the topic mode for the articles by the gaming, sports, business and politics terms so that the topic mode is more specific.
 def adjust_topic_mode(
     input_text: str, prediction: LabelPrediction
 ) -> tuple[LabelPrediction, str | None]:
@@ -274,7 +276,7 @@ def adjust_topic_mode(
         )
     return prediction, None
 
-
+# Adjusts the event tag for the articles by the gaming and product launch terms which are associated with the articles.
 def adjust_event_tag(
     input_text: str, prediction: LabelPrediction
 ) -> tuple[LabelPrediction, str | None]:
@@ -290,11 +292,11 @@ def adjust_event_tag(
         )
     return prediction, None
 
-
+# Determines if the sentiment should be adjusted if the label is None or the confidence is low.
 def should_adjust(prediction: LabelPrediction) -> bool:
     return prediction.label is None or is_low_confidence(prediction)
 
-
+# Determines if the topic should be adjusted if the new label is different from the current label.
 def should_adjust_topic(prediction: LabelPrediction, new_label: str) -> bool:
     if prediction.label == new_label:
         return False
@@ -302,21 +304,21 @@ def should_adjust_topic(prediction: LabelPrediction, new_label: str) -> bool:
         return True
     return is_low_confidence(prediction)
 
-
+# Determines if the confidence is low.
 def is_low_confidence(prediction: LabelPrediction) -> bool:
     return prediction.confidence is None or prediction.confidence < LOW_CONFIDENCE
 
-
+# Determines if the confidence is high.
 def is_high_confidence(prediction: LabelPrediction) -> bool:
     return prediction.confidence is not None and prediction.confidence >= HIGH_CONFIDENCE
 
-
+# Determines the confidence for the predictions by the rule-based model.
 def rule_confidence(prediction: LabelPrediction) -> float | None:
     if prediction.confidence is None:
         return 0.6
     return round(max(prediction.confidence, LOW_CONFIDENCE), 3)
 
-
+# Creates the notes for the predictions by the rule-based model.
 def low_confidence_notes(
     predictions: dict[str, LabelPrediction],
 ) -> list[str]:
@@ -330,12 +332,12 @@ def low_confidence_notes(
             notes.append(f"{name} model confidence is low.")
     return notes
 
-
+# Calculates the score for the concept by the input text.
 def concept_score(input_text: str, concept: str) -> int:
     tokens = normalized_tokens(input_text)
     return sum(1 for term in DOMAIN_LEXICONS[concept] if term in tokens)
 
-
+# Normalizes the tokens for the input text to lowercase and removes the punctuation.
 def normalized_tokens(input_text: str) -> set[str]:
     return {
         token.strip(".,:;!?()[]{}'\"").lower()

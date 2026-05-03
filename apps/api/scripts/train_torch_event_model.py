@@ -29,6 +29,7 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
+    # Combine broad AG News topics with project labels when both are present.
     examples = load_training_examples(
         project_data=args.project_data,
         topic_data=args.topic_data,

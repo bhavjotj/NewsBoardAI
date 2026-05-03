@@ -54,6 +54,7 @@ def load_unlabeled_examples(input_path: Path, output_path: Path) -> list[dict]:
     if not input_path.exists():
         return []
 
+    # Query + URL is stable enough to avoid relabeling the same source card.
     labeled_keys = load_labeled_keys(output_path)
     examples = []
     for row in read_jsonl(input_path):
