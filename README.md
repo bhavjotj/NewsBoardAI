@@ -43,6 +43,7 @@ Search query
 -> Ollama brief/impact wording
 -> structured dashboard response
 -> React web app or Chrome side panel
+```
 
 Detailed docs:
 
