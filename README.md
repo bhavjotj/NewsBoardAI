@@ -15,6 +15,7 @@ Search for a company, stock, game, sports team, political issue, product, or tre
 - Hybrid rule-based analysis with safe fallbacks
 - scikit-learn TF-IDF baseline models for sentiment, event, and topic signals
 - Optional PyTorch broad-topic classifier for business, sports, tech, and politics/general support
+- Optional local Ollama brief generation with template fallback
 - Cautious dashboard fields: overall signal, sentiment, event tags, confidence, possible impact, and sources
 - Local JSONL data collection, labeling, and training scripts
 
@@ -44,6 +45,7 @@ Detailed docs:
 
 - [ML baseline](docs/ML_BASELINE.md)
 - [PyTorch event/topic model](docs/PYTORCH_EVENT_MODEL.md)
+- [Ollama local brief generation](docs/OLLAMA_BRIEF.md)
 - [Chrome extension](docs/CHROME_EXTENSION.md)
 
 ## Local Setup

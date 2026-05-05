@@ -47,7 +47,7 @@ With the backend running, try compact searches such as:
 - `Toronto Raptors`
 - `Bitcoin`
 
-The extension sends `query`, `max_results`, `use_real_news: true`, and `use_ml: true` to the local backend.
+The extension sends `query`, `max_results`, `use_real_news: true`, `use_ml: true`, `use_torch: true`, and `use_llm_brief: true` to the local backend.
 
 ## Reload After Changes
 

@@ -39,6 +39,7 @@ function App() {
         use_real_news: true,
         use_ml: true,
         use_torch: true,
+        use_llm_brief: true,
       });
       setDashboard(result);
       setLastUpdated(new Date());

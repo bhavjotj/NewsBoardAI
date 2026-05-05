@@ -1,5 +1,6 @@
 export type DataSource = "mock" | "google_news_rss" | "fallback_mock";
 export type AnalysisSource = "rule_based" | "hybrid_ml" | "hybrid_ml_fallback";
+export type BriefSource = "template" | "ollama" | "ollama_fallback";
 
 export type DashboardMode =
   | "general"
@@ -31,11 +32,13 @@ export interface DashboardResponse {
   time_window: string;
   overall_signal: string;
   brief: string;
+  brief_source: BriefSource;
   sentiment: SentimentSummary;
   event_tags: string[];
   sources: SourceCardData[];
   confidence: "low" | "medium" | "high";
   possible_impact: string;
+  llm_available?: boolean | null;
   torch_used?: boolean;
   torch_available?: boolean;
 }
@@ -46,4 +49,5 @@ export interface DashboardRequest {
   use_real_news: true;
   use_ml: true;
   use_torch: true;
+  use_llm_brief: true;
 }

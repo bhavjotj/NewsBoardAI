@@ -28,6 +28,12 @@ class AnalysisSource(str, Enum):
     HYBRID_ML = "hybrid_ml"
     HYBRID_ML_FALLBACK = "hybrid_ml_fallback"
 
+# Tracks how the dashboard brief was written
+class BriefSource(str, Enum):
+    TEMPLATE = "template"
+    OLLAMA = "ollama"
+    OLLAMA_FALLBACK = "ollama_fallback"
+
 # The request sent by the frontend
 class DashboardRequest(BaseModel):
     query: str = Field(..., min_length=1)
@@ -37,6 +43,8 @@ class DashboardRequest(BaseModel):
     save_examples: bool = False
     use_ml: bool = True
     use_torch: bool = True
+    use_llm_brief: bool = True
+    ollama_model: str = "llama3.2"
     debug_analysis: bool = False
 
     # Validates the query, ensuring it is not empty
@@ -70,11 +78,13 @@ class DashboardResponse(BaseModel):
     time_window: str
     overall_signal: str
     brief: str
+    brief_source: BriefSource
     sentiment: SentimentSummary
     event_tags: list[str]
     sources: list[SourceCard]
     confidence: str
     possible_impact: str
+    llm_available: Optional[bool] = None
     torch_used: Optional[bool] = None
     torch_available: Optional[bool] = None
     analysis_debug: Optional[dict[str, Any]] = None

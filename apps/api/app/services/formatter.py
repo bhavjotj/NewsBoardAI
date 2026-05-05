@@ -10,6 +10,7 @@ from app.models.dashboard import (
     SourceCard,
 )
 from app.services.analyzer import DashboardAnalysis
+from app.services.brief_generator import generate_dashboard_brief
 from app.services.fetchers import NewsArticle
 from app.utils.text import clean_snippet
 
@@ -25,6 +26,20 @@ def format_dashboard_response(
     torch_used: bool | None = None,
     torch_available: bool | None = None,
 ) -> DashboardResponse:
+    template_brief = _brief(request.query, articles, analysis)
+    brief_result = generate_dashboard_brief(
+        query=request.query,
+        detected_mode=detected_mode,
+        overall_signal=analysis.overall_signal,
+        sentiment_label=analysis.sentiment_label,
+        sentiment_score=analysis.sentiment_score,
+        event_tags=analysis.event_tags,
+        possible_impact=analysis.possible_impact,
+        articles=articles,
+        template_brief=template_brief,
+        use_llm=request.use_llm_brief,
+        model=request.ollama_model,
+    )
     return DashboardResponse(
         topic=request.query,
         data_source=data_source,
@@ -32,7 +47,8 @@ def format_dashboard_response(
         detected_mode=detected_mode,
         time_window="Recent news",
         overall_signal=analysis.overall_signal,
-        brief=_brief(request.query, articles, analysis),
+        brief=brief_result.brief,
+        brief_source=brief_result.brief_source,
         sentiment=SentimentSummary(
             label=analysis.sentiment_label,
             score=analysis.sentiment_score,
@@ -50,6 +66,7 @@ def format_dashboard_response(
         ],
         confidence=analysis.confidence,
         possible_impact=analysis.possible_impact,
+        llm_available=brief_result.llm_available,
         torch_used=torch_used,
         torch_available=torch_available,
         analysis_debug=analysis_debug,

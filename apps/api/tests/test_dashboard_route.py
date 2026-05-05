@@ -6,14 +6,37 @@ from pydantic import ValidationError
 from app.main import app
 from app.models.dashboard import (
     AnalysisSource,
+    BriefSource,
     DashboardMode,
     DashboardRequest,
     DataSource,
 )
 from app.routes.news import create_dashboard
 from app.services.analyzer import DashboardAnalysis
+from app.services.brief_generator import BriefGenerationResult
 from app.services.fetchers import NewsArticle
 from app.services.hybrid_analyzer import HybridAnalysisResult
+
+
+@pytest.fixture(autouse=True)
+def mock_llm_brief_generation(monkeypatch) -> None:
+    def fake_generate_dashboard_brief(**kwargs):
+        if kwargs["use_llm"]:
+            return BriefGenerationResult(
+                kwargs["template_brief"],
+                BriefSource.OLLAMA_FALLBACK,
+                False,
+            )
+        return BriefGenerationResult(
+            kwargs["template_brief"],
+            BriefSource.TEMPLATE,
+            None,
+        )
+
+    monkeypatch.setattr(
+        "app.services.formatter.generate_dashboard_brief",
+        fake_generate_dashboard_brief,
+    )
 
 
 def test_dashboard_route_returns_compact_response() -> None:
@@ -34,6 +57,8 @@ def test_dashboard_route_returns_compact_response() -> None:
     assert body["detected_mode"] == DashboardMode.BUSINESS
     assert body["time_window"] == "Recent news"
     assert body["brief"]
+    assert body["brief_source"] == BriefSource.OLLAMA_FALLBACK
+    assert body["llm_available"] is False
     assert "source cards" not in body["brief"]
     assert body["sentiment"]["label"] in {"positive", "neutral", "negative", "mixed"}
     assert "market" in body["event_tags"]
