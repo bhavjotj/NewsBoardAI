@@ -1,6 +1,6 @@
 # NewsBoardAI Ollama Briefs
 
-NewsBoardAI can use a local Ollama model to rewrite the dashboard brief in more natural language.
+NewsBoardAI can use a local Ollama model to rewrite the dashboard brief and possible impact in more natural language.
 
 The Ollama brief is grounded only in:
 
@@ -9,9 +9,10 @@ The Ollama brief is grounded only in:
 - detected mode
 - sentiment
 - event tags
-- possible impact
+- confidence
+- the template brief and possible impact
 
-Ollama does not choose sentiment, event tags, confidence, sources, or impact. The existing hybrid analyzer still owns those fields.
+Ollama does not choose sentiment, event tags, confidence, sources, detected mode, or sources. The existing hybrid analyzer still owns the analysis. Ollama only rewrites presentation text.
 
 ## Local Setup
 
@@ -56,6 +57,10 @@ Dashboard requests support:
 
 The backend always creates the normal template brief first.
 
-If Ollama is not installed, not running, takes longer than 10 seconds, returns empty text, or returns text that is too long, NewsBoardAI keeps the template brief and marks the response as `ollama_fallback`.
+Ollama is asked for strict JSON with a short `brief` and one-sentence `possible_impact`.
+
+If Ollama is not installed, not running, takes longer than 10 seconds, returns invalid JSON, returns empty text, or returns text that is too long, NewsBoardAI keeps the template text and marks the response as `ollama_fallback`.
+
+If only one generated field is valid, NewsBoardAI uses that field and falls back only for the invalid field. Those fields are marked as `ollama_partial`.
 
 The app works without Ollama. Ollama is local and free to use, but it uses your machine's CPU/GPU resources.

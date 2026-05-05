@@ -1,6 +1,10 @@
 export type DataSource = "mock" | "google_news_rss" | "fallback_mock";
 export type AnalysisSource = "rule_based" | "hybrid_ml" | "hybrid_ml_fallback";
-export type BriefSource = "template" | "ollama" | "ollama_fallback";
+export type BriefSource =
+  | "template"
+  | "ollama"
+  | "ollama_partial"
+  | "ollama_fallback";
 
 export type DashboardMode =
   | "general"
@@ -38,6 +42,7 @@ export interface DashboardResponse {
   sources: SourceCardData[];
   confidence: "low" | "medium" | "high";
   possible_impact: string;
+  possible_impact_source: BriefSource;
   llm_available?: boolean | null;
   torch_used?: boolean;
   torch_available?: boolean;

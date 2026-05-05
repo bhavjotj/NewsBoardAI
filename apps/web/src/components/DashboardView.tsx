@@ -38,7 +38,7 @@ export function DashboardView({ dashboard, lastUpdated }: DashboardViewProps) {
           {dashboard.analysis_source && (
             <Badge tone="info">{formatLabel(dashboard.analysis_source)}</Badge>
           )}
-          {dashboard.brief_source === "ollama" && (
+          {usesLocalLlm(dashboard) && (
             <Badge tone="info">Local LLM</Badge>
           )}
           {dashboard.torch_used && <Badge tone="info">neural topic</Badge>}
@@ -142,4 +142,10 @@ function insightIcon(signal: string) {
     return AlertCircle;
   }
   return Activity;
+}
+
+function usesLocalLlm(dashboard: DashboardResponse) {
+  return [dashboard.brief_source, dashboard.possible_impact_source].some((source) =>
+    source === "ollama" || source === "ollama_partial"
+  );
 }

@@ -23,14 +23,18 @@ def mock_llm_brief_generation(monkeypatch) -> None:
     def fake_generate_dashboard_brief(**kwargs):
         if kwargs["use_llm"]:
             return BriefGenerationResult(
-                kwargs["template_brief"],
-                BriefSource.OLLAMA_FALLBACK,
-                False,
+                brief=kwargs["template_brief"],
+                possible_impact=kwargs["template_possible_impact"],
+                brief_source=BriefSource.OLLAMA_FALLBACK,
+                possible_impact_source=BriefSource.OLLAMA_FALLBACK,
+                llm_available=False,
             )
         return BriefGenerationResult(
-            kwargs["template_brief"],
-            BriefSource.TEMPLATE,
-            None,
+            brief=kwargs["template_brief"],
+            possible_impact=kwargs["template_possible_impact"],
+            brief_source=BriefSource.TEMPLATE,
+            possible_impact_source=BriefSource.TEMPLATE,
+            llm_available=None,
         )
 
     monkeypatch.setattr(
@@ -58,6 +62,7 @@ def test_dashboard_route_returns_compact_response() -> None:
     assert body["time_window"] == "Recent news"
     assert body["brief"]
     assert body["brief_source"] == BriefSource.OLLAMA_FALLBACK
+    assert body["possible_impact_source"] == BriefSource.OLLAMA_FALLBACK
     assert body["llm_available"] is False
     assert "source cards" not in body["brief"]
     assert body["sentiment"]["label"] in {"positive", "neutral", "negative", "mixed"}

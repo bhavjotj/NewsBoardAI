@@ -32,6 +32,7 @@ class AnalysisSource(str, Enum):
 class BriefSource(str, Enum):
     TEMPLATE = "template"
     OLLAMA = "ollama"
+    OLLAMA_PARTIAL = "ollama_partial"
     OLLAMA_FALLBACK = "ollama_fallback"
 
 # The request sent by the frontend
@@ -84,6 +85,7 @@ class DashboardResponse(BaseModel):
     sources: list[SourceCard]
     confidence: str
     possible_impact: str
+    possible_impact_source: BriefSource
     llm_available: Optional[bool] = None
     torch_used: Optional[bool] = None
     torch_available: Optional[bool] = None

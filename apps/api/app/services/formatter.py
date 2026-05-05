@@ -34,9 +34,11 @@ def format_dashboard_response(
         sentiment_label=analysis.sentiment_label,
         sentiment_score=analysis.sentiment_score,
         event_tags=analysis.event_tags,
+        confidence_label=analysis.confidence,
         possible_impact=analysis.possible_impact,
         articles=articles,
         template_brief=template_brief,
+        template_possible_impact=analysis.possible_impact,
         use_llm=request.use_llm_brief,
         model=request.ollama_model,
     )
@@ -65,7 +67,8 @@ def format_dashboard_response(
             for article in articles
         ],
         confidence=analysis.confidence,
-        possible_impact=analysis.possible_impact,
+        possible_impact=brief_result.possible_impact,
+        possible_impact_source=brief_result.possible_impact_source,
         llm_available=brief_result.llm_available,
         torch_used=torch_used,
         torch_available=torch_available,

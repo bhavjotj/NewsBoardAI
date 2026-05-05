@@ -15,7 +15,7 @@ Search for a company, stock, game, sports team, political issue, product, or tre
 - Hybrid rule-based analysis with safe fallbacks
 - scikit-learn TF-IDF baseline models for sentiment, event, and topic signals
 - Optional PyTorch broad-topic classifier for business, sports, tech, and politics/general support
-- Optional local Ollama brief generation with template fallback
+- Optional local Ollama brief/impact wording with template fallback
 - Cautious dashboard fields: overall signal, sentiment, event tags, confidence, possible impact, and sources
 - Local JSONL data collection, labeling, and training scripts
 
@@ -129,5 +129,5 @@ Local data and model artifacts under `data/` and `models/` are ignored by git.
 - More labeled NewsBoardAI examples
 - FinBERT-style business sentiment
 - Sentence-transformer similarity for source grouping
-- Local LLM/Ollama-assisted brief generation
+- Local LLM/Ollama-assisted brief and impact wording
 - More polished Chrome extension interactions
